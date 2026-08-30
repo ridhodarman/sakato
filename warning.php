@@ -5,15 +5,25 @@ require_once 'auth.php';
 // TANGGAL HARI INI
 // =====================================================
 $hariIni = new DateTime();
+$today = $hariIni->format('Y-m-d');
+
 
 // =====================================================
 // AMBIL DATA HARI LIBUR
 // =====================================================
+//
+// Hanya ambil hari libur yang relevan.
+// Sabtu/Minggu tidak perlu dimasukkan karena memang
+// bukan hari kerja.
+//
+
 $hariLibur = [];
 
 $sqlHariLibur = "
     SELECT tanggal
     FROM hari_libur
+    WHERE tanggal IS NOT NULL
+      AND tanggal <> '0000-00-00'
 ";
 
 $resultHariLibur = $koneksi->query($sqlHariLibur);
@@ -23,65 +33,220 @@ if (!$resultHariLibur) {
 }
 
 while ($libur = $resultHariLibur->fetch_assoc()) {
-    $hariLibur[$libur['tanggal']] = true;
+
+    $tanggalLibur = $libur['tanggal'];
+
+    // Pastikan hanya Senin-Jumat
+    $hari = (int)date('N', strtotime($tanggalLibur));
+
+    if ($hari <= 5) {
+        $hariLibur[] = $tanggalLibur;
+    }
 }
 
 
 // =====================================================
-// CEK HARI KERJA
+// SORT HARI LIBUR
 // =====================================================
-function isWorkingDay($tanggal, $hariLibur = [])
+
+sort($hariLibur);
+
+
+// =====================================================
+// FUNGSI BINARY SEARCH
+// =====================================================
+//
+// Mencari posisi pertama tanggal >= target
+//
+
+function lowerBoundDate($array, $target)
 {
-    $date = new DateTime($tanggal);
+    $low = 0;
+    $high = count($array);
 
-    // Sabtu dan Minggu bukan hari kerja
-    if ((int)$date->format('N') >= 6) {
-        return false;
+    while ($low < $high) {
+
+        $mid = intdiv($low + $high, 2);
+
+        if ($array[$mid] < $target) {
+            $low = $mid + 1;
+        } else {
+            $high = $mid;
+        }
     }
 
-    // Hari libur dari database bukan hari kerja
-    if (isset($hariLibur[$date->format('Y-m-d')])) {
-        return false;
-    }
-
-    return true;
+    return $low;
 }
 
 
 // =====================================================
-// HITUNG UMUR BERKAS DALAM HARI KERJA
+// HITUNG JUMLAH HARI LIBUR DALAM RANGE
 // =====================================================
-function getWorkingDays($startDate, $endDate, $hariLibur = [])
-{
-    $begin = new DateTime($startDate);
+//
+// Karena array hari libur sudah diurutkan,
+// tidak perlu memeriksa seluruh hari libur.
+//
+// Kompleksitas menjadi sangat kecil: O(log n)
+//
+
+// $hariLibur hanya berisi Senin-Jumat
+
+function countHolidayBetween(
+    $startDate,
+    $endDate,
+    $hariLibur
+) {
+
+    if (empty($hariLibur)) {
+        return 0;
+    }
+
+    if ($endDate < $startDate) {
+        return 0;
+    }
+
+    $startIndex = lowerBoundDate(
+        $hariLibur,
+        $startDate
+    );
+
+    $endIndex = lowerBoundDate(
+        $hariLibur,
+        $endDate
+    );
+
+    /*
+     * Karena endDate juga harus dihitung,
+     * cek apakah tanggal tersebut merupakan
+     * hari libur.
+     */
+    $count = $endIndex - $startIndex;
+
+    if (
+        isset($hariLibur[$endIndex]) &&
+        $hariLibur[$endIndex] === $endDate
+    ) {
+        $count++;
+    }
+
+    return $count;
+}
+
+
+// =====================================================
+// HITUNG HARI KERJA
+// =====================================================
+//
+// Senin-Jumat
+// dikurangi hari libur.
+//
+// Tanggal mulai dan tanggal akhir ikut dihitung.
+//
+// TIDAK melakukan loop setiap tanggal.
+//
+
+function getWorkingDays(
+    $startDate,
+    $endDate,
+    $hariLibur = []
+) {
+
+    // Kosong
+    if (
+        empty($startDate) ||
+        empty($endDate) ||
+        $startDate === '0000-00-00' ||
+        $endDate === '0000-00-00'
+    ) {
+        return 0;
+    }
+
+    // Jika tanggal akhir sebelum tanggal mulai
+    if ($endDate < $startDate) {
+        return 0;
+    }
+
+    $start = new DateTime($startDate);
     $end   = new DateTime($endDate);
 
-    // Tanggal akhir ikut dihitung
-    $end->modify('+1 day');
+    /*
+     * Jumlah hari kalender inklusif
+     */
+    $totalDays =
+        (int)$start->diff($end)->days + 1;
 
-    $interval = new DateInterval('P1D');
-    $daterange = new DatePeriod($begin, $interval, $end);
+    /*
+     * Minggu penuh
+     */
+    $fullWeeks =
+        intdiv($totalDays, 7);
 
-    $workingDays = 0;
+    /*
+     * Hari kerja dari minggu penuh
+     */
+    $workingDays =
+        $fullWeeks * 5;
 
-    foreach ($daterange as $date) {
+    /*
+     * Sisa hari
+     */
+    $remainingDays =
+        $totalDays % 7;
 
-        if (isWorkingDay(
-            $date->format('Y-m-d'),
-            $hariLibur
-        )) {
+    /*
+     * 1 = Senin
+     * 5 = Jumat
+     * 6 = Sabtu
+     * 7 = Minggu
+     */
+    $startDay =
+        (int)$start->format('N');
+
+    /*
+     * Hitung hari kerja pada sisa hari.
+     * Maksimal hanya 6 kali loop,
+     * bukan loop seluruh tanggal.
+     */
+    for ($i = 0; $i < $remainingDays; $i++) {
+
+        $day =
+            (($startDay - 1 + $i) % 7) + 1;
+
+        if ($day <= 5) {
             $workingDays++;
         }
     }
 
-    return $workingDays;
+    /*
+     * Kurangi hari libur yang jatuh
+     * pada rentang tersebut.
+     */
+    $jumlahHariLibur =
+        countHolidayBetween(
+            $startDate,
+            $endDate,
+            $hariLibur
+        );
+
+    $workingDays -= $jumlahHariLibur;
+
+    return max(0, $workingDays);
 }
+
 
 // =====================================================
 // AMBIL DATA BERKAS
 // =====================================================
+//
+// 0000-00-00 dianggap kosong.
+//
+// Dengan kondisi ini database tidak mengirimkan
+// berkas yang memang tidak mempunyai tanggal mulai.
+//
+
 $sql = "
     SELECT
+
         b.id,
         b.no_berkas,
         b.tahun,
@@ -112,12 +277,14 @@ $sql = "
         ON ps.id = b.posisi_id
 
     WHERE
-        b.status <> 'selesai'
-        OR b.status IS NULL
+        (b.status <> 'selesai' OR b.status IS NULL)
+        AND b.tanggal_mulai IS NOT NULL
+        AND b.tanggal_mulai <> '0000-00-00'
 
     ORDER BY
         b.tanggal_mulai ASC
 ";
+
 
 $result = $koneksi->query($sql);
 
@@ -125,90 +292,221 @@ if (!$result) {
     die("Query gagal: " . $koneksi->error);
 }
 
+
 // =====================================================
 // ARRAY DATA
 // =====================================================
+
 $dataWaspada = [];
 $dataKritis = [];
 $dataKadaluarsa = [];
-$rekapPosisi = []; // Menyimpan rekap jumlah berkas per posisi
+
+$rekapPosisi = [];
+
+
+// =====================================================
+// CACHE PERHITUNGAN UMUR
+// =====================================================
+//
+// Jika banyak berkas memiliki tanggal mulai yang sama,
+// perhitungan hari kerja cukup dilakukan satu kali.
+//
+
+$umurCache = [];
+
 
 // =====================================================
 // PROSES DATA
 // =====================================================
+
 while ($row = $result->fetch_assoc()) {
-    if (empty($row['tanggal_mulai'])) {
+
+    $tanggalMulaiString =
+        $row['tanggal_mulai'] ?? '';
+
+    /*
+     * Pengaman tambahan.
+     *
+     * Walaupun sudah difilter SQL,
+     * tetap cek di PHP.
+     */
+    if (
+        empty($tanggalMulaiString) ||
+        $tanggalMulaiString === '0000-00-00'
+    ) {
         continue;
     }
 
-    $tanggalMulai = new DateTime($row['tanggal_mulai']);
-    
-    // Format tanggal ke dd-mm-yyyy
-    $row['tanggal_mulai_formatted'] = $tanggalMulai->format('d-m-Y');
 
-// =====================================================
-// HITUNG UMUR BERKAS DALAM HARI KERJA
-// Senin-Jumat dikurangi hari libur
-// =====================================================
-$umurHari = getWorkingDays(
-    $row['tanggal_mulai'],
-    $hariIni->format('Y-m-d'),
-    $hariLibur
-);
+    // =================================================
+    // FORMAT TANGGAL
+    // =================================================
 
-    // Ambil Batas Layanan
-    $waspada = (int) ($row['waspada'] ?? 0);
-    $kritis = (int) ($row['kritis'] ?? 0);
-    $jatuhTempo = (int) ($row['jatuh_tempo'] ?? 0);
+    $tanggalMulai =
+        new DateTime($tanggalMulaiString);
 
+    $row['tanggal_mulai_formatted'] =
+        $tanggalMulai->format('d-m-Y');
+
+
+    // =================================================
+    // HITUNG UMUR BERKAS
+    // =================================================
+
+    /*
+     * Gunakan cache.
+     */
+    if (isset($umurCache[$tanggalMulaiString])) {
+
+        $umurHari =
+            $umurCache[$tanggalMulaiString];
+
+    } else {
+
+        $umurHari =
+            getWorkingDays(
+                $tanggalMulaiString,
+                $today,
+                $hariLibur
+            );
+
+        $umurCache[$tanggalMulaiString] =
+            $umurHari;
+    }
+
+
+    // =================================================
+    // BATAS LAYANAN
+    // =================================================
+
+    $waspada =
+        (int)($row['waspada'] ?? 0);
+
+    $kritis =
+        (int)($row['kritis'] ?? 0);
+
+    $jatuhTempo =
+        (int)($row['jatuh_tempo'] ?? 0);
+
+
+    /*
+     * Jika layanan tidak mempunyai
+     * jatuh tempo, tidak perlu diproses.
+     */
     if ($jatuhTempo <= 0) {
         continue;
     }
 
-    $sisaHari = $jatuhTempo - $umurHari;
 
-    // Penentuan Kategori
+    // =================================================
+    // SISA HARI
+    // =================================================
+
+    $sisaHari =
+        $jatuhTempo - $umurHari;
+
+
+    // =================================================
+    // PENENTUAN KATEGORI
+    // =================================================
+
     if ($umurHari > $jatuhTempo) {
+
         $kategori = 'kadaluarsa';
+
     } elseif ($umurHari >= $kritis) {
+
         $kategori = 'kritis';
+
     } elseif ($umurHari >= $waspada) {
+
         $kategori = 'waspada';
+
     } else {
+
+        /*
+         * Masih normal.
+         * Tidak perlu dimasukkan ke tabel.
+         */
         continue;
     }
 
-    $row['umur_hari'] = $umurHari;
-    $row['sisa_hari'] = $sisaHari;
-    $row['kategori'] = $kategori;
 
-    $posisiNama = !empty($row['nama_posisi']) ? $row['nama_posisi'] : 'Tanpa Posisi';
+    // =================================================
+    // SIMPAN HASIL
+    // =================================================
 
-    // Inisialisasi Rekap Posisi jika belum ada
+    $row['umur_hari'] =
+        $umurHari;
+
+    $row['sisa_hari'] =
+        $sisaHari;
+
+    $row['kategori'] =
+        $kategori;
+
+
+    // =================================================
+    // REKAP POSISI
+    // =================================================
+
+    $posisiNama =
+        !empty($row['nama_posisi'])
+        ? $row['nama_posisi']
+        : 'Tanpa Posisi';
+
+
     if (!isset($rekapPosisi[$posisiNama])) {
+
         $rekapPosisi[$posisiNama] = [
+
             'waspada' => 0,
+
             'kritis' => 0,
+
             'kadaluarsa' => 0
         ];
     }
 
-    if ($kategori == 'waspada') {
+
+    // =================================================
+    // MASUKKAN KE KATEGORI
+    // =================================================
+
+    if ($kategori === 'waspada') {
+
         $dataWaspada[] = $row;
+
         $rekapPosisi[$posisiNama]['waspada']++;
-    } elseif ($kategori == 'kritis') {
+
+    } elseif ($kategori === 'kritis') {
+
         $dataKritis[] = $row;
+
         $rekapPosisi[$posisiNama]['kritis']++;
-    } elseif ($kategori == 'kadaluarsa') {
+
+    } elseif ($kategori === 'kadaluarsa') {
+
         $dataKadaluarsa[] = $row;
+
         $rekapPosisi[$posisiNama]['kadaluarsa']++;
     }
 }
 
-// Total Keseluruhan
-$totalWaspada = count($dataWaspada);
-$totalKritis = count($dataKritis);
-$totalKadaluarsa = count($dataKadaluarsa);
+
+// =====================================================
+// TOTAL KESELURUHAN
+// =====================================================
+
+$totalWaspada =
+    count($dataWaspada);
+
+$totalKritis =
+    count($dataKritis);
+
+$totalKadaluarsa =
+    count($dataKadaluarsa);
+
 ?>
 <!doctype html>
 <html lang="id">

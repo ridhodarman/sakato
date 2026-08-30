@@ -4,70 +4,176 @@ require_once 'koneksi.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-function addWorkingDays($startDate, $daysToAdd)
-{
-    $date = new DateTime($startDate);
-    $added = 0;
+$today = date('Y-m-d');
 
-    while ($added < $daysToAdd) {
-        $date->modify('+1 day');
 
-        if ($date->format('N') < 6) {
-            $added++;
+/*
+|--------------------------------------------------------------------------
+| HARI LIBUR
+|--------------------------------------------------------------------------
+*/
+
+$hariLibur = [];
+
+$qLibur = mysqli_query($koneksi, "
+    SELECT tanggal
+    FROM hari_libur
+");
+
+if ($qLibur) {
+
+    while ($rowLibur = mysqli_fetch_assoc($qLibur)) {
+
+        /*
+         * Jangan masukkan tanggal kosong / 0000-00-00
+         */
+        if (
+            !empty($rowLibur['tanggal']) &&
+            $rowLibur['tanggal'] !== '0000-00-00'
+        ) {
+            $hariLibur[$rowLibur['tanggal']] = true;
         }
     }
-
-    return $date->format('Y-m-d');
 }
 
-function getWorkingDays($startDate, $endDate)
+
+/*
+|--------------------------------------------------------------------------
+| FUNGSI JUMLAH HARI KERJA
+|--------------------------------------------------------------------------
+|
+| NULL dan 0000-00-00 dianggap kosong.
+|
+*/
+
+function getWorkingDays($startDate, $endDate, $hariLibur = [])
 {
-    $begin = new DateTime($startDate);
+    /*
+     * Tanggal kosong tidak dihitung
+     */
+    if (
+        empty($startDate) ||
+        empty($endDate) ||
+        $startDate === '0000-00-00' ||
+        $endDate === '0000-00-00'
+    ) {
+        return 0;
+    }
+
+
+    /*
+     * Jika tanggal akhir lebih kecil dari tanggal mulai
+     */
+    if ($endDate < $startDate) {
+        return 0;
+    }
+
+
+    $start = new DateTime($startDate);
     $end   = new DateTime($endDate);
 
-    $end->modify('+1 day');
 
-    $interval = new DateInterval('P1D');
-    $daterange = new DatePeriod($begin, $interval, $end);
+    /*
+     * Jumlah hari kalender inklusif
+     */
+    $totalDays = (int)$start->diff($end)->days + 1;
 
-    $workingDays = 0;
 
-    foreach ($daterange as $date) {
-        if ($date->format('N') < 6) {
+    /*
+     * Minggu penuh
+     */
+    $fullWeeks = intdiv($totalDays, 7);
+
+
+    /*
+     * 5 hari kerja setiap minggu
+     */
+    $workingDays = $fullWeeks * 5;
+
+
+    /*
+     * Sisa hari
+     */
+    $remainingDays = $totalDays % 7;
+
+    $startDay = (int)$start->format('N');
+
+
+    for ($i = 0; $i < $remainingDays; $i++) {
+
+        $day = (($startDay - 1 + $i) % 7) + 1;
+
+        if ($day <= 5) {
             $workingDays++;
         }
     }
 
-    return $workingDays;
+
+    /*
+     * Kurangi hari libur yang jatuh pada Senin-Jumat
+     */
+    foreach ($hariLibur as $holidayDate => $dummy) {
+
+        if (
+            $holidayDate >= $startDate &&
+            $holidayDate <= $endDate
+        ) {
+
+            $holidayDay = (int)date(
+                'N',
+                strtotime($holidayDate)
+            );
+
+            if ($holidayDay <= 5) {
+                $workingDays--;
+            }
+        }
+    }
+
+
+    return max(0, $workingDays);
 }
 
-$today = date('Y-m-d');
 
 /*
 |--------------------------------------------------------------------------
-| DataTables parameters
+| DATATABLES PARAMETER
 |--------------------------------------------------------------------------
 */
 
-$draw   = isset($_GET['draw']) ? (int)$_GET['draw'] : 1;
-$start  = isset($_GET['start']) ? (int)$_GET['start'] : 0;
-$length = isset($_GET['length']) ? (int)$_GET['length'] : 50;
+$draw = isset($_GET['draw'])
+    ? (int)$_GET['draw']
+    : 1;
+
+
+$start = isset($_GET['start'])
+    ? (int)$_GET['start']
+    : 0;
+
+
+$length = isset($_GET['length'])
+    ? (int)$_GET['length']
+    : 50;
+
 
 if ($length <= 0) {
     $length = 50;
 }
 
+
 if ($length > 100) {
     $length = 100;
 }
+
 
 if ($start < 0) {
     $start = 0;
 }
 
+
 /*
 |--------------------------------------------------------------------------
-| Search
+| SEARCH
 |--------------------------------------------------------------------------
 */
 
@@ -77,10 +183,26 @@ if (isset($_GET['search']['value'])) {
     $search = trim($_GET['search']['value']);
 }
 
-$where = "WHERE b.status = 'proses' AND b.tanggal_mulai IS NOT NULL";
+
+/*
+|--------------------------------------------------------------------------
+| WHERE
+|--------------------------------------------------------------------------
+|
+| NULL dan 0000-00-00 dianggap kosong.
+|
+*/
+
+$where = "
+    WHERE b.status = 'proses'
+      AND b.tanggal_mulai IS NOT NULL
+      AND b.tanggal_mulai <> '0000-00-00'
+";
+
 
 $params = [];
 $types  = '';
+
 
 if ($search !== '') {
 
@@ -93,61 +215,126 @@ if ($search !== '') {
         )
     ";
 
+
     $searchLike = '%' . $search . '%';
 
+
     $params[] = $searchLike;
     $params[] = $searchLike;
     $params[] = $searchLike;
     $params[] = $searchLike;
 
-    $types .= 'ssss';
+
+    $types = 'ssss';
 }
+
 
 /*
 |--------------------------------------------------------------------------
-| Total seluruh data
+| TOTAL DATA
 |--------------------------------------------------------------------------
 */
 
 $sqlTotal = "
     SELECT COUNT(*) AS total
-    FROM berkas_rutin b
-    WHERE b.status = 'proses'
-      AND b.tanggal_mulai IS NOT NULL
+
+    FROM berkas_rutin
+
+    WHERE status = 'proses'
+      AND tanggal_mulai IS NOT NULL
+      AND tanggal_mulai <> '0000-00-00'
 ";
 
-$qTotal = mysqli_query($koneksi, $sqlTotal);
 
-$totalRecords = (int)mysqli_fetch_assoc($qTotal)['total'];
+$qTotal = mysqli_query(
+    $koneksi,
+    $sqlTotal
+);
 
-/*
-|--------------------------------------------------------------------------
-| Total setelah pencarian
-|--------------------------------------------------------------------------
-*/
 
-$sqlFiltered = "
-    SELECT COUNT(*) AS total
-    FROM berkas_rutin b
-    LEFT JOIN layanan l ON b.layanan_id = l.id
-    $where
-";
+$totalRecords = 0;
 
-$stmtFiltered = mysqli_prepare($koneksi, $sqlFiltered);
 
-if (!empty($params)) {
-    mysqli_stmt_bind_param(
-        $stmtFiltered,
-        $types,
-        ...$params
+if ($qTotal) {
+
+    $rowTotal = mysqli_fetch_assoc($qTotal);
+
+    $totalRecords = (int)(
+        $rowTotal['total'] ?? 0
     );
 }
 
-mysqli_stmt_execute($stmtFiltered);
 
-$resultFiltered = mysqli_stmt_get_result($stmtFiltered);
+/*
+|--------------------------------------------------------------------------
+| TOTAL FILTERED
+|--------------------------------------------------------------------------
+|
+| Kalau tidak ada pencarian, tidak perlu
+| melakukan COUNT kedua.
+|
+*/
 
-$totalFiltered = (int)mysqli_fetch_assoc($resultFiltered)['total'];
+if ($search === '') {
+
+    $totalFiltered = $totalRecords;
+
+} else {
+
+    $sqlFiltered = "
+        SELECT COUNT(*) AS total
+
+        FROM berkas_rutin b
+
+        LEFT JOIN layanan l
+            ON b.layanan_id = l.id
+
+        $where
+    ";
+
+
+    $stmtFiltered = mysqli_prepare(
+        $koneksi,
+        $sqlFiltered
+    );
+
+
+    if (!empty($params)) {
+
+        mysqli_stmt_bind_param(
+            $stmtFiltered,
+            $types,
+            ...$params
+        );
+    }
+
+
+    mysqli_stmt_execute(
+        $stmtFiltered
+    );
+
+
+    $resultFiltered =
+        mysqli_stmt_get_result(
+            $stmtFiltered
+        );
+
+
+    $rowFiltered =
+        mysqli_fetch_assoc(
+            $resultFiltered
+        );
+
+
+    $totalFiltered = (int)(
+        $rowFiltered['total'] ?? 0
+    );
+
+
+    mysqli_stmt_close(
+        $stmtFiltered
+    );
+}
 
 
 /*
@@ -156,45 +343,66 @@ $totalFiltered = (int)mysqli_fetch_assoc($resultFiltered)['total'];
 |--------------------------------------------------------------------------
 */
 
-$orderColumn = 4;
+$orderColumn = 3;
+
 $orderDir = 'asc';
 
+
 if (isset($_GET['order'][0]['column'])) {
-    $orderColumn = (int)$_GET['order'][0]['column'];
+
+    $orderColumn =
+        (int)$_GET['order'][0]['column'];
 }
 
+
 if (isset($_GET['order'][0]['dir'])) {
-    $orderDir = strtolower($_GET['order'][0]['dir']) === 'desc'
-        ? 'desc'
-        : 'asc';
+
+    $orderDir =
+        strtolower(
+            $_GET['order'][0]['dir']
+        ) === 'desc'
+        ? 'DESC'
+        : 'ASC';
 }
+
 
 /*
 |--------------------------------------------------------------------------
-| Mapping kolom DataTables ke kolom database
+| MAPPING ORDER
 |--------------------------------------------------------------------------
 */
 
 $orderColumns = [
+
     0 => 'b.no_berkas',
+
     1 => 'b.nama_pemohon',
+
     2 => 'l.nama_layanan',
+
     3 => 'b.tanggal_mulai',
+
     4 => 'b.tanggal_mulai',
+
     5 => 'b.tanggal_mulai'
+
 ];
 
-$orderBy = $orderColumns[$orderColumn] ?? 'b.tanggal_mulai';
+
+$orderBy =
+    $orderColumns[$orderColumn]
+    ?? 'b.tanggal_mulai';
 
 
 /*
 |--------------------------------------------------------------------------
-| Query HANYA 50 data
+| DATA HANYA SESUAI HALAMAN DATATABLES
 |--------------------------------------------------------------------------
 */
 
 $sql = "
     SELECT
+
         b.id,
         b.no_berkas,
         b.tahun,
@@ -220,13 +428,21 @@ $sql = "
     LIMIT ? OFFSET ?
 ";
 
-$stmt = mysqli_prepare($koneksi, $sql);
+
+$stmt = mysqli_prepare(
+    $koneksi,
+    $sql
+);
+
 
 $paramsData = $params;
+
 $typesData = $types . 'ii';
+
 
 $paramsData[] = $length;
 $paramsData[] = $start;
+
 
 mysqli_stmt_bind_param(
     $stmt,
@@ -234,115 +450,182 @@ mysqli_stmt_bind_param(
     ...$paramsData
 );
 
-mysqli_stmt_execute($stmt);
 
-$result = mysqli_stmt_get_result($stmt);
+mysqli_stmt_execute(
+    $stmt
+);
+
+
+$result =
+    mysqli_stmt_get_result(
+        $stmt
+    );
+
 
 $data = [];
 
 
 /*
 |--------------------------------------------------------------------------
-| Proses maksimal 50 data
+| PROSES DATA
 |--------------------------------------------------------------------------
+|
+| Maksimal hanya 50/100 data.
+|
 */
 
 while ($row = mysqli_fetch_assoc($result)) {
 
-    $sla = (int)($row['sla_hari'] ?? 5);
-
-    $waspada_limit = isset($row['waspada'])
-        ? (int)$row['waspada']
-        : ($sla - 2);
-
-    $kritis_limit = isset($row['kritis'])
-        ? (int)$row['kritis']
-        : ($sla - 1);
-
-
-    $working_days_elapsed = getWorkingDays(
-        $row['tanggal_mulai'],
-        $today
-    );
-
-    $due_date = addWorkingDays(
-        $row['tanggal_mulai'],
-        $sla
-    );
-
-    $remaining_days = $sla - $working_days_elapsed;
+    /*
+     * Pengaman tambahan.
+     *
+     * Seharusnya data 0000-00-00 sudah tidak masuk
+     * karena sudah difilter oleh WHERE.
+     */
+    if (
+        empty($row['tanggal_mulai']) ||
+        $row['tanggal_mulai'] === '0000-00-00'
+    ) {
+        continue;
+    }
 
 
     /*
     |--------------------------------------------------------------------------
-    | Status SLA
+    | SLA
+    |--------------------------------------------------------------------------
+    */
+
+    $sla = (int)(
+        $row['sla_hari'] ?? 5
+    );
+
+
+    $waspada_limit = isset(
+        $row['waspada']
+    )
+        ? (int)$row['waspada']
+        : max(0, $sla - 2);
+
+
+    $kritis_limit = isset(
+        $row['kritis']
+    )
+        ? (int)$row['kritis']
+        : max(0, $sla - 1);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | HITUNG HARI KERJA
+    |--------------------------------------------------------------------------
+    */
+
+    $working_days_elapsed =
+        getWorkingDays(
+            $row['tanggal_mulai'],
+            $today,
+            $hariLibur
+        );
+
+
+    $remaining_days =
+        $sla - $working_days_elapsed;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATUS SLA
     |--------------------------------------------------------------------------
     */
 
     if ($working_days_elapsed > $sla) {
 
         $sla_status = 'Jatuh Tempo';
-        $badge_class = 'bg-dark text-white';
 
-    } elseif ($working_days_elapsed >= $kritis_limit) {
+        $badge_class =
+            'bg-dark text-white';
+
+    } elseif (
+        $working_days_elapsed >=
+        $kritis_limit
+    ) {
 
         $sla_status = 'Kritis';
-        $badge_class = 'bg-danger';
 
-    } elseif ($working_days_elapsed >= $waspada_limit) {
+        $badge_class =
+            'bg-danger';
+
+    } elseif (
+        $working_days_elapsed >=
+        $waspada_limit
+    ) {
 
         $sla_status = 'Waspada';
-        $badge_class = 'bg-warning text-dark';
+
+        $badge_class =
+            'bg-warning text-dark';
 
     } else {
 
         $sla_status = 'Normal';
-        $badge_class = 'bg-primary';
+
+        $badge_class =
+            'bg-primary';
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | Buat HTML kolom
+    | ESCAPE OUTPUT
     |--------------------------------------------------------------------------
     */
 
-    $noBerkas = htmlspecialchars(
-        $row['no_berkas'] ?? '-',
-        ENT_QUOTES,
-        'UTF-8'
-    );
+    $noBerkas =
+        htmlspecialchars(
+            $row['no_berkas'] ?? '-',
+            ENT_QUOTES,
+            'UTF-8'
+        );
 
-    $tahun = htmlspecialchars(
-        $row['tahun'] ?? '-',
-        ENT_QUOTES,
-        'UTF-8'
-    );
 
-    $pemohon = htmlspecialchars(
-        $row['nama_pemohon'] ?? '-',
-        ENT_QUOTES,
-        'UTF-8'
-    );
+    $tahun =
+        htmlspecialchars(
+            $row['tahun'] ?? '-',
+            ENT_QUOTES,
+            'UTF-8'
+        );
 
-    $layanan = htmlspecialchars(
-        $row['nama_layanan'] ?? '-',
-        ENT_QUOTES,
-        'UTF-8'
-    );
+
+    $pemohon =
+        htmlspecialchars(
+            $row['nama_pemohon'] ?? '-',
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+
+    $layanan =
+        htmlspecialchars(
+            $row['nama_layanan'] ?? '-',
+            ENT_QUOTES,
+            'UTF-8'
+        );
 
 
     /*
     |--------------------------------------------------------------------------
-    | Sisa waktu
+    | SISA WAKTU
     |--------------------------------------------------------------------------
     */
 
     if ($remaining_days < 0) {
 
         $sisaWaktu =
-            '<span class="badge bg-danger bg-opacity-10 fw-bold text-light">'
-            . 'Lewat ' . abs($remaining_days) . ' hari'
+            '<span class="badge bg-danger text-white">'
+            . 'Lewat '
+            . abs($remaining_days)
+            . ' hari'
             . '</span>';
 
     } elseif ($remaining_days == 0) {
@@ -355,15 +638,44 @@ while ($row = mysqli_fetch_assoc($result)) {
     } else {
 
         $sisaWaktu =
-            '<span class="badge bg-success bg-opacity-10">'
-            . $remaining_days . ' hari lagi'
+            '<span class="badge bg-success text-white">'
+            . $remaining_days
+            . ' hari lagi'
             . '</span>';
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | Data untuk DataTables
+    | TANGGAL MULAI
+    |--------------------------------------------------------------------------
+    */
+
+    $tanggalMulai = '-';
+
+    if (
+        !empty($row['tanggal_mulai']) &&
+        $row['tanggal_mulai'] !== '0000-00-00'
+    ) {
+
+        $timestamp = strtotime(
+            $row['tanggal_mulai']
+        );
+
+        if ($timestamp !== false) {
+
+            $tanggalMulai =
+                date(
+                    'd/m/Y',
+                    $timestamp
+                );
+        }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DATA DATATABLES
     |--------------------------------------------------------------------------
     */
 
@@ -379,10 +691,7 @@ while ($row = mysqli_fetch_assoc($result)) {
 
         $layanan,
 
-        date(
-            'd/m/Y',
-            strtotime($row['tanggal_mulai'])
-        ),
+        $tanggalMulai,
 
         $sisaWaktu,
 
@@ -391,19 +700,34 @@ while ($row = mysqli_fetch_assoc($result)) {
         . ' rounded-pill px-2 py-1">'
         . $sla_status
         . '</span>'
+
     ];
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| Response DataTables
+| RESPONSE DATATABLES
 |--------------------------------------------------------------------------
 */
 
-echo json_encode([
-    'draw' => $draw,
-    'recordsTotal' => $totalRecords,
-    'recordsFiltered' => $totalFiltered,
-    'data' => $data
-], JSON_UNESCAPED_UNICODE);
+echo json_encode(
+
+    [
+
+        'draw' =>
+            $draw,
+
+        'recordsTotal' =>
+            $totalRecords,
+
+        'recordsFiltered' =>
+            $totalFiltered,
+
+        'data' =>
+            $data
+
+    ],
+
+    JSON_UNESCAPED_UNICODE
+);

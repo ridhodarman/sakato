@@ -63,7 +63,7 @@ if (isset($_GET['delete'])) {
 }
 
 // 4. AMBIL SEMUA DATA UNTUK DITAMPILKAN
-$result = $koneksi->query("SELECT * FROM pic ORDER BY nama DESC");
+$result = $koneksi->query("SELECT * FROM pic ORDER BY nama");
 ?>
 <!doctype html>
 <html lang="id">

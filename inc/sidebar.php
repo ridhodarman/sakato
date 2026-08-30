@@ -1,7 +1,7 @@
 <!-- Brand / Header -->
 <div class="pb-3 mb-3 border-bottom" style="border-color: rgba(255, 255, 255, 0.14) !important;">
     <a href="dashboard.php" class="text-white text-decoration-none">
-        <span class="h4 font-weight-bold font-bold d-block mb-0">SAKATO V2</span>
+        <span class="h4 font-weight-bold font-bold d-block mb-0">SAKATO</span>
         <small class="d-block text-white" style="font-size: 0.72rem; line-height: 1.3;">
             Sistem Akselerasi Kolaboratif Tunggakan Online<br>
             Kantor Pertanahan Kabupaten Agam

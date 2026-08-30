@@ -66,47 +66,93 @@ function addWorkingDays($startDate, $daysToAdd, $hariLibur = [])
 }
 
 
+
 /**
  * Menghitung jumlah hari kerja antara dua tanggal
+ *
+ * INKLUSIF tanggal mulai dan tanggal selesai.
  *
  * Tidak menghitung:
  * - Sabtu
  * - Minggu
- * - Hari libur dari tabel hari_libur
+ * - Hari libur pada tabel hari_libur
  */
 function getWorkingDays($startDate, $endDate, $hariLibur = [])
 {
-    $begin = new DateTime($startDate);
+    $start = new DateTime($startDate);
     $end   = new DateTime($endDate);
 
-    // Tetap inklusif sampai tanggal akhir
-    $end->modify('+1 day');
+    // Jika tanggal akhir sebelum tanggal mulai
+    if ($end < $start) {
+        return 0;
+    }
 
-    $interval = new DateInterval('P1D');
-    $daterange = new DatePeriod($begin, $interval, $end);
+    // Jumlah hari kalender inklusif
+    $totalDays = (int)$start->diff($end)->days + 1;
 
-    $workingDays = 0;
+    // Jumlah minggu penuh
+    $fullWeeks = intdiv($totalDays, 7);
 
-    foreach ($daterange as $date) {
+    // Hari kerja dari minggu penuh
+    $workingDays = $fullWeeks * 5;
 
-        if (isWorkingDay($date->format('Y-m-d'), $hariLibur)) {
+    // Sisa hari
+    $remainingDays = $totalDays % 7;
+
+    $startDayOfWeek = (int)$start->format('N'); // Senin = 1 ... Minggu = 7
+
+    for ($i = 0; $i < $remainingDays; $i++) {
+
+        $dayOfWeek = (($startDayOfWeek - 1 + $i) % 7) + 1;
+
+        if ($dayOfWeek <= 5) {
             $workingDays++;
         }
     }
 
-    return $workingDays;
+    /*
+     * Kurangi hari libur yang:
+     * - berada dalam range tanggal
+     * - jatuh pada Senin-Jumat
+     */
+    foreach ($hariLibur as $holidayDate => $dummy) {
+
+        if ($holidayDate < $startDate || $holidayDate > $endDate) {
+            continue;
+        }
+
+        $holidayDay = (int)date('N', strtotime($holidayDate));
+
+        if ($holidayDay <= 5) {
+            $workingDays--;
+        }
+    }
+
+    return max(0, $workingDays);
 }
+
+
 
 $today = date('Y-m-d');
 
 // 1. Query KPI Base
-$q_proses    = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM berkas_rutin WHERE status = 'proses'");
-$q_selesai   = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM berkas_rutin WHERE status = 'selesai'");
-$q_eskalasi  = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM berkas_rutin WHERE status = 'eskalasi'");
+$q_kpi = mysqli_query($koneksi, "
+    SELECT
+        SUM(status = 'proses') AS total_proses,
+        SUM(status = 'selesai') AS total_selesai,
+        SUM(status = 'eskalasi') AS total_eskalasi
+    FROM berkas_rutin
+");
 
-$total_proses   = mysqli_fetch_assoc($q_proses)['total'] ?? 0;
-$total_selesai  = mysqli_fetch_assoc($q_selesai)['total'] ?? 0;
-$total_eskalasi = mysqli_fetch_assoc($q_eskalasi)['total'] ?? 0;
+if (!$q_kpi) {
+    die('Query KPI gagal: ' . mysqli_error($koneksi));
+}
+
+$kpi = mysqli_fetch_assoc($q_kpi);
+
+$total_proses   = (int)($kpi['total_proses'] ?? 0);
+$total_selesai  = (int)($kpi['total_selesai'] ?? 0);
+$total_eskalasi = (int)($kpi['total_eskalasi'] ?? 0);
 
 // 2. Calculation & Detail Mapping
 $count_normal      = 0;
@@ -141,6 +187,7 @@ $q_sla = mysqli_query($koneksi, "
     LEFT JOIN layanan l
         ON b.layanan_id = l.id
     WHERE b.tanggal_mulai IS NOT NULL
+      AND b.status IN ('proses', 'selesai')
 ");
 
 if (!$q_sla) {
@@ -417,7 +464,7 @@ $ontime_rate = ($total_selesai_eval > 0)
                         <div class="card border-0 rounded-4 shadow-sm p-3 h-100 bg-white">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h6 class="fw-bold mb-0"><i class="fas fa-trophy me-2 text-success"></i>Winrate Penyelesaian Berkas (SOP)</h6>
-                                <span class="badge bg-success bg-opacity-10 fw-bold fs-6">
+                                <span class="badge bg-success bg-opacity-10 fw-bold fs-6 text-light">
                                     <?= $ontime_rate; ?>% Tepat Waktu
                                 </span>
                             </div>

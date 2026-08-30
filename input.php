@@ -1,5 +1,5 @@
 <?php
-require_once 'inc/koneksi.php';
+require_once 'auth.php';
 ?>
 <!doctype html>
 <html lang="id">
@@ -20,7 +20,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <div class="container-fluid p-0">
     <div class="row no-gutters min-vh-100">
         <!-- Sidebar Column -->
-        <aside class="col-md-3 col-lg-2 text-white p-3 min-vh-100 sticky-top" style="background: linear-gradient(180deg, #0f2e50, #194c7e);">
+        <aside class="col-md-3 col-lg-2 text-white p-3 menusidebar">
             <?php include "inc/sidebar.php"; ?>
         </aside>
         
@@ -167,6 +167,50 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </div>
     </a>
 </div>
+
+
+
+<!-- Menu Card: Kelola Data Akun -->
+
+<div class="col-12 col-md-6 col-lg-5 mt-5"> <a href="akun.php" class="text-decoration-none"> <div class="card h-100 border-0 text-white rounded-4 overflow-hidden position-relative p-4 card-futuristic card-akun"> <!-- Overlay Gradient Glowing --> <div class="card-glow"></div>
+
+        <div class="card-body position-relative z-1 d-flex flex-column justify-content-between">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="icon-wrapper d-flex align-items-center justify-content-center rounded-3 bg-opacity-10 bg-white">
+                        <i class="fas fa-user-shield fa-2x text-warning"></i>
+                    </div>
+
+                    <span class="badge rounded-pill bg-warning bg-opacity-20 text-warning px-3 py-2 border border-warning border-opacity-25"
+                          style="font-size: 0.75rem;">
+                        ACCOUNT
+                    </span>
+                </div>
+
+                <h3 class="fw-bold fs-4 mb-2 text-white">
+                    Kelola Data Akun
+                </h3>
+
+                <p class="text-white-50 small mb-4">
+                    Kelola akun pengguna, informasi profil, serta pengaturan akses dan keamanan akun.
+                </p>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between pt-3 border-top border-light border-opacity-10">
+                <span class="small font-monospace text-warning">
+                    Kelola Akun &rarr;
+                </span>
+
+                <div class="btn-arrow rounded-circle d-flex align-items-center justify-content-center">
+                    <i class="fas fa-chevron-right text-white"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</a>
+
+</div>
+
 
 
 </div>

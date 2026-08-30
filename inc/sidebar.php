@@ -9,14 +9,29 @@
     </a>
 </div>
 
+<?php
+// Ambil data nama dan username dari session
+$nama_user = $_SESSION['sakato_nama'] ?? $_SESSION['nama'] ?? $_SESSION['sakato_username'] ?? $_SESSION['username'] ?? 'User';
+$username  = $_SESSION['sakato_username'] ?? $_SESSION['username'] ?? 'guest';
+
+// Ambil huruf pertama untuk inisial avatar
+$inisial = strtoupper(substr($nama_user, 0, 1));
+?>
+
 <!-- User Profile Card -->
 <div class="d-flex align-items-center p-2 rounded mb-3" style="background: rgba(255, 255, 255, 0.09);">
-    <div class="rounded-circle bg-white text-dark font-weight-bold font-bold d-flex align-items-center justify-content-center mr-2" style="width: 38px; height: 38px; min-width: 38px; color: #14385f !important;">
-        K
+    <!-- Avatar Inisial -->
+    <div class="rounded-circle bg-white font-weight-bold d-flex align-items-center justify-content-center mr-2" style="width: 38px; height: 38px; min-width: 38px; color: #14385f !important; font-size: 1rem;">
+        <?= htmlspecialchars($inisial); ?>
     </div>
+    <!-- Info User -->
     <div class="overflow-hidden">
-        <div class="font-weight-bold font-bold text-truncate text-white" style="font-size: 0.85rem;">Kepala Kantor</div>
-        <small class="text-white-50 d-block" style="font-size: 0.75rem;">Pimpinan</small>
+        <div class="font-weight-bold text-truncate text-white" style="font-size: 0.85rem;" title="<?= htmlspecialchars($nama_user); ?>">
+            <?= htmlspecialchars($nama_user); ?>
+        </div>
+        <small class="text-white-50 d-block text-truncate" style="font-size: 0.75rem;">
+            @<?= htmlspecialchars($username); ?>
+        </small>
     </div>
 </div>
 

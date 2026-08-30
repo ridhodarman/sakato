@@ -1,19 +1,14 @@
 <?php
-require_once 'inc/koneksi.php';
-
+require_once 'auth.php';
 
 // =====================================================
 // DATA KINERJA PIC
 // =====================================================
 
 $sql = "
-
 SELECT
-
     p.id AS pic_id,
     p.nama AS nama_pic,
-
-    COUNT(b.id) AS total_berkas,
 
     SUM(
         CASE
@@ -33,50 +28,45 @@ SELECT
 
     SUM(
         CASE
-            WHEN
-                b.status <> 'selesai'
-                AND DATEDIFF(CURDATE(), b.tanggal_mulai) > l.jatuh_tempo
+            WHEN b.status <> 'selesai'
+                 AND DATEDIFF(CURDATE(), b.tanggal_mulai) >= l.waspada
+                 AND DATEDIFF(CURDATE(), b.tanggal_mulai) < l.kritis
+            THEN 1
+            ELSE 0
+        END
+    ) AS total_waspada,
+
+    SUM(
+        CASE
+            WHEN b.status <> 'selesai'
+                 AND DATEDIFF(CURDATE(), b.tanggal_mulai) >= l.kritis
+                 AND DATEDIFF(CURDATE(), b.tanggal_mulai) <= l.jatuh_tempo
+            THEN 1
+            ELSE 0
+        END
+    ) AS total_kritis,
+
+    SUM(
+        CASE
+            WHEN b.status <> 'selesai'
+                 AND DATEDIFF(CURDATE(), b.tanggal_mulai) > l.jatuh_tempo
             THEN 1
             ELSE 0
         END
     ) AS total_kadaluarsa
 
-
 FROM pic p
-
-
-LEFT JOIN layanan l
-
-    ON l.pic_id = p.id
-
-
-LEFT JOIN berkas_rutin b
-
-    ON b.layanan_id = l.id
-
-
-GROUP BY
-
-    p.id,
-    p.nama
-
-
-ORDER BY
-
-    total_berkas DESC
-
+LEFT JOIN layanan l ON l.pic_id = p.id
+LEFT JOIN berkas_rutin b ON b.layanan_id = l.id
+GROUP BY p.id, p.nama
+ORDER BY total_proses DESC
 ";
-
 
 $result = $koneksi->query($sql);
 
-
 if (!$result) {
-
     die("Query gagal: " . $koneksi->error);
-
 }
-
 
 // =====================================================
 // SIMPAN DATA
@@ -85,38 +75,33 @@ if (!$result) {
 $dataPIC = [];
 
 while ($row = $result->fetch_assoc()) {
-
-    $row['total_berkas'] = (int) $row['total_berkas'];
-    $row['total_proses'] = (int) $row['total_proses'];
-    $row['total_eskalasi'] = (int) $row['total_eskalasi'];
+    $row['total_proses']     = (int) $row['total_proses'];
+    $row['total_eskalasi']   = (int) $row['total_eskalasi'];
+    $row['total_waspada']    = (int) $row['total_waspada'];
+    $row['total_kritis']     = (int) $row['total_kritis'];
     $row['total_kadaluarsa'] = (int) $row['total_kadaluarsa'];
 
     $dataPIC[] = $row;
-
 }
-
 
 // =====================================================
 // STATISTIK GLOBAL
 // =====================================================
 
-$totalPIC = count($dataPIC);
-
-$totalBerkas = 0;
-$totalProses = 0;
-$totalEskalasi = 0;
+$totalPIC        = count($dataPIC);
+$totalProses     = 0;
+$totalEskalasi   = 0;
+$totalWaspada    = 0;
+$totalKritis     = 0;
 $totalKadaluarsa = 0;
 
-
 foreach ($dataPIC as $row) {
-
-    $totalBerkas += $row['total_berkas'];
-    $totalProses += $row['total_proses'];
-    $totalEskalasi += $row['total_eskalasi'];
+    $totalProses     += $row['total_proses'];
+    $totalEskalasi   += $row['total_eskalasi'];
+    $totalWaspada    += $row['total_waspada'];
+    $totalKritis     += $row['total_kritis'];
     $totalKadaluarsa += $row['total_kadaluarsa'];
-
 }
-
 ?>
 <!doctype html>
 <html lang="id">
@@ -127,364 +112,266 @@ foreach ($dataPIC as $row) {
     <title>SAKATO V2 - Kinerja PIC</title>
     <?php include "inc/head.php" ?>
     <style>
+        /* GENERAL */
+        body {
+            background: #f5f7fb;
+            color: #1e293b;
+        }
 
-/* =====================================================
-   GENERAL
-   ===================================================== */
+        .container-fluid {
+            padding: 25px;
+        }
 
-body {
-    background: #f5f7fb;
-    color: #1e293b;
-}
+        /* HEADER */
+        .page-header {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: white;
+            border-radius: 18px;
+            padding: 28px;
+            margin-bottom: 25px;
+            box-shadow: 0 15px 35px rgba(15, 23, 42, .20);
+        }
 
-.container-fluid {
-    padding: 25px;
-}
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+        }
 
-/* =====================================================
-   HEADER
-   ===================================================== */
+        .page-subtitle {
+            opacity: .7;
+            font-size: 14px;
+            margin-top: 7px;
+        }
 
-.page-header {
-    background: linear-gradient(135deg, #0f172a, #1e293b);
-    color: white;
-    border-radius: 18px;
-    padding: 28px;
-    margin-bottom: 25px;
-    box-shadow: 0 15px 35px rgba(15,23,42,.20);
-}
+        /* STAT CARD */
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            min-height: 130px;
+            box-shadow: 0 8px 25px rgba(15, 23, 42, .07);
+            margin-bottom: 20px;
+        }
 
-.page-title {
-    font-size: 28px;
-    font-weight: 700;
-    margin: 0;
-}
+        .stat-card::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 100%;
+        }
 
-.page-subtitle {
-    opacity: .7;
-    font-size: 14px;
-    margin-top: 7px;
-}
+        .stat-blue::before { background: #2563eb; }
+        .stat-orange::before { background: #f97316; }
+        .stat-yellow::before { background: #eab308; }
+        .stat-red-warning::before { background: #ef4444; }
+        .stat-red-dark::before { background: #991b1b; }
 
-/* =====================================================
-   STAT CARD
-   ===================================================== */
+        .stat-title {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
 
-.stat-card {
-    background: white;
-    border-radius: 16px;
-    padding: 20px;
-    position: relative;
-    overflow: hidden;
-    min-height: 130px;
-    box-shadow: 0 8px 25px rgba(15,23,42,.07);
-    margin-bottom: 20px;
-}
+        .stat-number {
+            font-size: 36px;
+            font-weight: 800;
+            margin-top: 5px;
+        }
 
-.stat-card::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 4px;
-    height: 100%;
-}
+        .stat-description {
+            color: #94a3b8;
+            font-size: 12px;
+        }
 
-.stat-blue::before {
-    background: #2563eb;
-}
+        /* MAIN TABLE */
+        .table-card {
+            background: white;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(15, 23, 42, .08);
+        }
 
-.stat-orange::before {
-    background: #f97316;
-}
+        .table-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e2e8f0;
+        }
 
-.stat-red::before {
-    background: #dc2626;
-}
+        .table-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0;
+        }
 
-.stat-title {
-    color: #64748b;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
+        .table thead th {
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .7px;
+            white-space: nowrap;
+            border: none;
+            padding: 14px;
+        }
 
-.stat-number {
-    font-size: 36px;
-    font-weight: 800;
-    margin-top: 5px;
-}
+        .table tbody td {
+            padding: 15px 12px;
+            vertical-align: middle;
+            border-color: #f1f5f9;
+            font-size: 13px;
+        }
 
-.stat-description {
-    color: #94a3b8;
-    font-size: 12px;
-}
+        .pic-name {
+            font-weight: 700;
+            color: #0f172a;
+        }
 
-/* =====================================================
-   MAIN TABLE
-   ===================================================== */
+        /* BADGES */
+        .badge-custom {
+            padding: 5px 9px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            display: inline-block;
+            min-width: 32px;
+            text-align: center;
+        }
 
-.table-card {
-    background: white;
-    border-radius: 18px;
-    overflow: hidden;
-    box-shadow: 0 8px 30px rgba(15,23,42,.08);
-}
+        .badge-proses { background: #eff6ff; color: #1d4ed8; }
+        .badge-eskalasi { background: #fff7ed; color: #c2410c; }
+        .badge-waspada { background: #fefce8; color: #a16207; }
+        .badge-kritis { background: #fef2f2; color: #dc2626; }
+        .badge-kadaluarsa { background: #450a0a; color: #ffffff; }
 
-.table-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-.table-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0;
-}
-
-.table thead th {
-    background: #f8fafc;
-    color: #64748b;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: .7px;
-    white-space: nowrap;
-    border: none;
-    padding: 14px;
-}
-
-.table tbody td {
-    padding: 15px 12px;
-    vertical-align: middle;
-    border-color: #f1f5f9;
-    font-size: 13px;
-}
-
-/* =====================================================
-   PIC NAME
-   ===================================================== */
-
-.pic-name {
-    font-weight: 700;
-    color: #0f172a;
-}
-
-/* =====================================================
-   BADGE
-   ===================================================== */
-
-.badge-custom {
-    padding: 5px 9px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.badge-proses {
-    background: #eff6ff;
-    color: #1d4ed8;
-}
-
-.badge-eskalasi {
-    background: #fff7ed;
-    color: #c2410c;
-}
-
-.badge-kadaluarsa {
-    background: #fef2f2;
-    color: #b91c1c;
-}
-
-/* =====================================================
-   RESPONSIVE
-   ===================================================== */
-
-@media (max-width: 768px) {
-    .container-fluid {
-        padding: 15px;
-    }
-
-    .page-title {
-        font-size: 23px;
-    }
-}
-
-</style>
+        @media (max-width: 768px) {
+            .container-fluid { padding: 15px; }
+            .page-title { font-size: 23px; }
+        }
+    </style>
 </head>
 
 <body>
-<?php
-$current_page = basename($_SERVER['PHP_SELF']);
-?>
+<?php $current_page = basename($_SERVER['PHP_SELF']); ?>
 
 <div class="container-fluid p-0">
     <div class="row no-gutters min-vh-100">
         <!-- Sidebar Column -->
-        <aside class="col-md-3 col-lg-2 text-white p-3 min-vh-100 sticky-top" style="background: linear-gradient(180deg, #0f2e50, #194c7e);">
+        <aside class="col-md-3 col-lg-2 text-white p-3 menusidebar">
             <?php include "inc/sidebar.php"; ?>
         </aside>
-        
+
         <!-- Main Content Column -->
         <main class="col-md-9 col-lg-10 p-4">
             <div class="container-fluid">
 
-                <!-- =====================================================
-                     HEADER
-                     ===================================================== -->
-
+                <!-- HEADER -->
                 <div class="page-header">
-                    <h1 class="page-title">
-                        Kinerja PIC
-                    </h1>
+                    <h1 class="page-title">Kinerja PIC</h1>
                     <div class="page-subtitle">
                         Monitoring status berkas aktif berdasarkan PIC layanan
                     </div>
                 </div>
 
-                <!-- =====================================================
-                     STATISTIK GLOBAL
-                     ===================================================== -->
-
+                <!-- STATISTIK GLOBAL -->
                 <div class="row">
-
-                    <div class="col-lg-4 col-md-6">
+                    <div class="col-lg-2 col-md-4 col-6">
                         <div class="stat-card stat-blue">
-                            <div class="stat-title">
-                                Total Berkas
-                            </div>
-                            <div class="stat-number">
-                                <?= $totalBerkas ?>
-                            </div>
-                            <div class="stat-description">
-                                Seluruh berkas yang ditangani PIC
-                            </div>
+                            <div class="stat-title">Total</div>
+                            <div class="stat-number"><?= $totalProses ?></div>
+                            <div class="stat-description">Berkas ditangani</div>
                         </div>
                     </div>
 
-                    <div class="col-lg-4 col-md-6">
+                    <div class="col-lg-3 col-md-4 col-6">
                         <div class="stat-card stat-orange">
-                            <div class="stat-title">
-                                Eskalasi
-                            </div>
-                            <div class="stat-number">
-                                <?= $totalEskalasi ?>
-                            </div>
-                            <div class="stat-description">
-                                Membutuhkan pertimbangan pimpinan
-                            </div>
+                            <div class="stat-title">Eskalasi</div>
+                            <div class="stat-number"><?= $totalEskalasi ?></div>
+                            <div class="stat-description">Butuh pertimbangan pimpinan</div>
                         </div>
                     </div>
 
-                    <div class="col-lg-4 col-md-6">
-                        <div class="stat-card stat-red">
-                            <div class="stat-title">
-                                Kadaluarsa
-                            </div>
-                            <div class="stat-number">
-                                <?= $totalKadaluarsa ?>
-                            </div>
-                            <div class="stat-description">
-                                Berkas melewati jatuh tempo
-                            </div>
+
+                    <div class="col-lg-3 col-md-6 col-6">
+                        <div class="stat-card stat-red-dark">
+                            <div class="stat-title">Kadaluarsa</div>
+                            <div class="stat-number"><?= $totalKadaluarsa ?></div>
+                            <div class="stat-description">Melewati jatuh tempo</div>
                         </div>
                     </div>
-
                 </div>
 
-                <!-- =====================================================
-                     TABEL
-                     ===================================================== -->
-
+                <!-- TABEL KINERJA -->
                 <div class="table-card">
-
                     <div class="table-header">
-                        <h2 class="table-title">
-                            Kinerja Seluruh PIC
-                        </h2>
+                        <h2 class="table-title">Kinerja Seluruh PIC</h2>
                     </div>
 
                     <div class="table-responsive">
-
                         <table class="table table-hover mb-0">
-
                             <thead>
                                 <tr>
                                     <th>#</th>
                                     <th>PIC</th>
-                                    <th>Total</th>
                                     <th>Proses</th>
                                     <th>Eskalasi</th>
+                                    <th>Waspada</th>
+                                    <th>Kritis</th>
                                     <th>Kadaluarsa</th>
                                 </tr>
                             </thead>
-
                             <tbody>
-
                             <?php foreach ($dataPIC as $ranking => $row): ?>
-
                                 <tr>
-
-                                    <!-- RANKING -->
-                                    <td>
-                                        <strong>
-                                            #<?= $ranking + 1 ?>
-                                        </strong>
-                                    </td>
-
-                                    <!-- PIC -->
+                                    <td><strong>#<?= $ranking + 1 ?></strong></td>
                                     <td>
                                         <div class="pic-name">
                                             <?= htmlspecialchars($row['nama_pic']) ?>
                                         </div>
                                     </td>
-
-                                    <!-- TOTAL -->
-                                    <td>
-                                        <strong>
-                                            <?= $row['total_berkas'] ?>
-                                        </strong>
-                                    </td>
-
-                                    <!-- PROSES -->
                                     <td>
                                         <span class="badge-custom badge-proses">
                                             <?= $row['total_proses'] ?>
                                         </span>
                                     </td>
-
-                                    <!-- ESKALASI -->
                                     <td>
                                         <span class="badge-custom badge-eskalasi">
                                             <?= $row['total_eskalasi'] ?>
                                         </span>
                                     </td>
-
-                                    <!-- KADALUARSA -->
+                                    <td>
+                                        <span class="badge-custom badge-waspada">
+                                            <?= $row['total_waspada'] ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge-custom badge-kritis">
+                                            <?= $row['total_kritis'] ?>
+                                        </span>
+                                    </td>
                                     <td>
                                         <span class="badge-custom badge-kadaluarsa">
                                             <?= $row['total_kadaluarsa'] ?>
                                         </span>
                                     </td>
-
                                 </tr>
-
                             <?php endforeach; ?>
 
                             <?php if (count($dataPIC) == 0): ?>
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted p-5">
+                                    <td colspan="7" class="text-center text-muted p-5">
                                         Belum ada data PIC.
                                     </td>
                                 </tr>
                             <?php endif; ?>
-
                             </tbody>
-
                         </table>
-
                     </div>
-
                 </div>
 
             </div>
@@ -494,7 +381,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <div id="toast" class="toast hidden"></div>
     <script src="assets/app.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {initUser(); render();});
+        document.addEventListener('DOMContentLoaded', () => { initUser(); render(); });
     </script>
 </div>
 </body>

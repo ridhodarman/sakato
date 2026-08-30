@@ -1,5 +1,5 @@
 <?php
-require_once 'inc/koneksi.php';
+require_once 'auth.php';
 
 /**
  * Ambil seluruh tanggal hari libur
@@ -310,7 +310,7 @@ $ontime_rate = ($total_selesai_eval > 0)
     <div class="row no-gutters min-vh-100">
         <!-- Sidebar -->
         <?php $current_page = basename($_SERVER['PHP_SELF']); ?>
-        <aside class="col-md-3 col-lg-2 text-white p-3 min-vh-100 sticky-top" style="background: linear-gradient(180deg, #0f2e50, #194c7e);">
+        <aside class="col-md-3 col-lg-2 text-white p-3 menusidebar">
             <?php include "inc/sidebar.php"; ?>
         </aside>
 

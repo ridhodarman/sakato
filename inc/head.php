@@ -35,3 +35,24 @@
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap4.min.js"></script>
+
+<style>
+.menusidebar {
+    background: linear-gradient(180deg, #0f2e50, #194c7e);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+}
+
+/* Mobile */
+@media (max-width: 767.98px) {
+    .menusidebar {
+        position: relative;
+        height: auto;
+        min-height: auto;
+        overflow-y: visible;
+    }
+}
+</style>
+

@@ -100,6 +100,75 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </a>
     </div>
 
+<!-- Card 1: Kelola Data Hari Libur -->
+<div class="col-12 col-md-6 col-lg-5  mt-5">
+    <a href="harilibur.php" class="text-decoration-none">
+        <div class="card h-100 border-0 text-white rounded-4 overflow-hidden position-relative p-4 card-futuristic card-harilibur">
+            <!-- Overlay Gradient Glowing -->
+            <div class="card-glow"></div>
+            
+            <div class="card-body position-relative z-1 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="icon-wrapper d-flex align-items-center justify-content-center rounded-3 bg-opacity-10 bg-white">
+                            <i class="fas fa-calendar-day fa-2x text-warning"></i>
+                        </div>
+                        <span class="badge rounded-pill bg-danger bg-opacity-20 text-danger px-3 py-2 border border-danger border-opacity-25" style="font-size: 0.75rem;">
+                           SYSTEM DATA
+                        </span>
+                    </div>
+                    <h3 class="fw-bold fs-4 mb-2 text-white">Kelola Data Hari Libur</h3>
+                    <p class="text-white-50 small mb-4">
+                        Atur kalender libur nasional dan hari libur operasional sistem.
+                    </p>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between pt-3 border-top border-light border-opacity-10">
+                    <span class="small font-monospace text-warning">Lihat Detail &rarr;</span>
+                    <div class="btn-arrow rounded-circle d-flex align-items-center justify-content-center">
+                        <i class="fas fa-chevron-right text-white"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </a>
+</div>
+
+<!-- Card 2: Kelola Data Posisi -->
+<div class="col-12 col-md-6 col-lg-5 mt-5">
+    <a href="posisi.php" class="text-decoration-none">
+        <div class="card h-100 border-0 text-white rounded-4 overflow-hidden position-relative p-4 card-futuristic card-posisi">
+            <!-- Overlay Gradient Glowing -->
+            <div class="card-glow"></div>
+            
+            <div class="card-body position-relative z-1 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="icon-wrapper d-flex align-items-center justify-content-center rounded-3 bg-opacity-10 bg-white">
+                            <i class="fas fa-sitemap fa-2x text-success"></i>
+                        </div>
+                        <span class="badge rounded-pill bg-success bg-opacity-20 text-success px-3 py-2 border border-success border-opacity-25" style="font-size: 0.75rem;">
+                            SYSTEM DATA
+                        </span>
+                    </div>
+                    <h3 class="fw-bold fs-4 mb-2 text-white">Kelola Data Posisi</h3>
+                    <p class="text-white-50 small mb-4">
+                        Atur data posisi.
+                    </p>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between pt-3 border-top border-light border-opacity-10">
+                    <span class="small font-monospace text-success">Lihat Detail &rarr;</span>
+                    <div class="btn-arrow rounded-circle d-flex align-items-center justify-content-center">
+                        <i class="fas fa-chevron-right text-white"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </a>
+</div>
+
+
 </div>
 
 <!-- Internal CSS pendukung tampilan Futuristic/Glassmorphism -->

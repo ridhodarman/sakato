@@ -106,7 +106,6 @@ $result = $koneksi->query($sql);
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>SAKATO V2 - Kinerja PIC</title>
-    <link rel="stylesheet" href="assets/style.css">
     <?php include "inc/head.php" ?>
 </head>
 
@@ -270,7 +269,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="form-row">
                         <div class="form-group col-md-6">
                             <label>Seksi</label>
-                            <input type="text" name="seksi" class="form-control" placeholder="Nama seksi...">
+                            <select name="seksi" class="form-control" placeholder="Nama seksi...">
+                                <option></option>
+                                <option value="Seksi Survei dan Pemetaan">Seksi Survei dan Pemetaan</option>
+                                <option value="Penetapan Hak dan Pendaftaran">Penetapan Hak dan Pendaftaran</option>
+                                <option value="Penataan dan Pemberdayaan">Penataan dan Pemberdayaan</option>
+                                <option value="Pengadaan Tanah dan Pengembangan">Pengadaan Tanah dan Pengembangan</option>
+                            </select>
                         </div>
                         <div class="form-group col-md-6">
                             <label>Penanggung Jawab (PIC)</label>

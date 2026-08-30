@@ -1,18 +1,646 @@
-<?php require __DIR__ . '/auth.php'; ?>
+<?php
+require_once 'inc/koneksi.php';
+
+// =====================================================
+// TANGGAL HARI INI
+// =====================================================
+$hariIni = new DateTime();
+
+// =====================================================
+// AMBIL DATA HARI LIBUR
+// =====================================================
+$hariLibur = [];
+
+$sqlHariLibur = "
+    SELECT tanggal
+    FROM hari_libur
+";
+
+$resultHariLibur = $koneksi->query($sqlHariLibur);
+
+if (!$resultHariLibur) {
+    die("Query hari libur gagal: " . $koneksi->error);
+}
+
+while ($libur = $resultHariLibur->fetch_assoc()) {
+    $hariLibur[$libur['tanggal']] = true;
+}
+
+
+// =====================================================
+// CEK HARI KERJA
+// =====================================================
+function isWorkingDay($tanggal, $hariLibur = [])
+{
+    $date = new DateTime($tanggal);
+
+    // Sabtu dan Minggu bukan hari kerja
+    if ((int)$date->format('N') >= 6) {
+        return false;
+    }
+
+    // Hari libur dari database bukan hari kerja
+    if (isset($hariLibur[$date->format('Y-m-d')])) {
+        return false;
+    }
+
+    return true;
+}
+
+
+// =====================================================
+// HITUNG UMUR BERKAS DALAM HARI KERJA
+// =====================================================
+function getWorkingDays($startDate, $endDate, $hariLibur = [])
+{
+    $begin = new DateTime($startDate);
+    $end   = new DateTime($endDate);
+
+    // Tanggal akhir ikut dihitung
+    $end->modify('+1 day');
+
+    $interval = new DateInterval('P1D');
+    $daterange = new DatePeriod($begin, $interval, $end);
+
+    $workingDays = 0;
+
+    foreach ($daterange as $date) {
+
+        if (isWorkingDay(
+            $date->format('Y-m-d'),
+            $hariLibur
+        )) {
+            $workingDays++;
+        }
+    }
+
+    return $workingDays;
+}
+
+// =====================================================
+// AMBIL DATA BERKAS
+// =====================================================
+$sql = "
+    SELECT
+        b.id,
+        b.no_berkas,
+        b.tahun,
+        b.nama_pemohon,
+        b.tanggal_mulai,
+        b.status,
+        b.catatan,
+        b.tanggal_selesai,
+        b.posisi_id,
+
+        l.nama_layanan,
+        l.jatuh_tempo,
+        l.waspada,
+        l.kritis,
+
+        p.nama AS nama_pic,
+        ps.nama_posisi AS nama_posisi
+
+    FROM berkas_rutin b
+
+    LEFT JOIN layanan l
+        ON l.id = b.layanan_id
+
+    LEFT JOIN pic p
+        ON p.id = l.pic_id
+
+    LEFT JOIN posisi ps
+        ON ps.id = b.posisi_id
+
+    WHERE
+        b.status <> 'selesai'
+        OR b.status IS NULL
+
+    ORDER BY
+        b.tanggal_mulai ASC
+";
+
+$result = $koneksi->query($sql);
+
+if (!$result) {
+    die("Query gagal: " . $koneksi->error);
+}
+
+// =====================================================
+// ARRAY DATA
+// =====================================================
+$dataWaspada = [];
+$dataKritis = [];
+$dataKadaluarsa = [];
+$rekapPosisi = []; // Menyimpan rekap jumlah berkas per posisi
+
+// =====================================================
+// PROSES DATA
+// =====================================================
+while ($row = $result->fetch_assoc()) {
+    if (empty($row['tanggal_mulai'])) {
+        continue;
+    }
+
+    $tanggalMulai = new DateTime($row['tanggal_mulai']);
+    
+    // Format tanggal ke dd-mm-yyyy
+    $row['tanggal_mulai_formatted'] = $tanggalMulai->format('d-m-Y');
+
+// =====================================================
+// HITUNG UMUR BERKAS DALAM HARI KERJA
+// Senin-Jumat dikurangi hari libur
+// =====================================================
+$umurHari = getWorkingDays(
+    $row['tanggal_mulai'],
+    $hariIni->format('Y-m-d'),
+    $hariLibur
+);
+
+    // Ambil Batas Layanan
+    $waspada = (int) ($row['waspada'] ?? 0);
+    $kritis = (int) ($row['kritis'] ?? 0);
+    $jatuhTempo = (int) ($row['jatuh_tempo'] ?? 0);
+
+    if ($jatuhTempo <= 0) {
+        continue;
+    }
+
+    $sisaHari = $jatuhTempo - $umurHari;
+
+    // Penentuan Kategori
+    if ($umurHari > $jatuhTempo) {
+        $kategori = 'kadaluarsa';
+    } elseif ($umurHari >= $kritis) {
+        $kategori = 'kritis';
+    } elseif ($umurHari >= $waspada) {
+        $kategori = 'waspada';
+    } else {
+        continue;
+    }
+
+    $row['umur_hari'] = $umurHari;
+    $row['sisa_hari'] = $sisaHari;
+    $row['kategori'] = $kategori;
+
+    $posisiNama = !empty($row['nama_posisi']) ? $row['nama_posisi'] : 'Tanpa Posisi';
+
+    // Inisialisasi Rekap Posisi jika belum ada
+    if (!isset($rekapPosisi[$posisiNama])) {
+        $rekapPosisi[$posisiNama] = [
+            'waspada' => 0,
+            'kritis' => 0,
+            'kadaluarsa' => 0
+        ];
+    }
+
+    if ($kategori == 'waspada') {
+        $dataWaspada[] = $row;
+        $rekapPosisi[$posisiNama]['waspada']++;
+    } elseif ($kategori == 'kritis') {
+        $dataKritis[] = $row;
+        $rekapPosisi[$posisiNama]['kritis']++;
+    } elseif ($kategori == 'kadaluarsa') {
+        $dataKadaluarsa[] = $row;
+        $rekapPosisi[$posisiNama]['kadaluarsa']++;
+    }
+}
+
+// Total Keseluruhan
+$totalWaspada = count($dataWaspada);
+$totalKritis = count($dataKritis);
+$totalKadaluarsa = count($dataKadaluarsa);
+?>
 <!doctype html>
-<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SAKATO V2 - Early Warning</title><link rel="stylesheet" href="assets/style.css"></head><body>
-<div class="app"><aside class="side"><div class="brand"><b>SAKATO V2</b><small>Sistem Akselerasi Kolaboratif Tunggakan Online<br>Kantor Pertanahan Kabupaten Agam</small></div><div class="user"><div id="avatar" class="avatar">K</div><div><b id="uname">Kepala Kantor</b><small id="urole">Pimpinan</small></div></div><nav>
-<a href="dashboard.php">▦ Dashboard</a>
-<a href="databerkas.php">▤ Database Berkas</a>
-<a href="warning.php">⚠ Early Warning</a>
-<a href="eskalasi.php">↗ Eskalasi</a>
-<a href="pic.php">👥 Kinerja PIC</a>
-<a href="input.php">＋ Input / Update</a>
-<a href="audit.php">☷ Audit Trail</a>
-<a href="setting.php">⚙ Pengaturan</a>
-</nav><div class="logout"><button id="logout" class="btn light" style="width:100%" onclick="logout()">Keluar</button></div></aside><main class="main"><div class="top"><div><h1>Early Warning</h1><div class="muted">Deteksi dini berkas mendekati atau melewati SLA.</div></div><div class="top-actions"><span id="date" class="pill"></span></div></div><section id="warning" class="section active"><div class="card"><h3>Early Warning System</h3><div class="muted" style="margin-bottom:11px">Deteksi otomatis berdasarkan umur berkas dibandingkan SLA.</div><div id="alerts"></div></div></section></main></div>
-<div id="modal" class="hidden"></div><div id="toast" class="toast hidden"></div>
-<script src="assets/app.js"></script><script>
-document.addEventListener('DOMContentLoaded',()=>{initUser();render();});
-</script></body></html>
+<html lang="id">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>SAKATO V2 - Kinerja PIC</title>
+    <?php include "inc/head.php" ?>
+    <style>
+        .stat-card {
+            position: relative;
+            overflow: hidden;
+            min-height: 155px;
+            padding: 24px;
+            border-radius: 18px;
+            color: #fff;
+            border: 1px solid rgba(255,255,255,.15);
+            box-shadow: 0 10px 30px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.15);
+            transition: transform .3s ease, box-shadow .3s ease;
+            margin-bottom: 25px;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 18px 40px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.2);
+        }
+
+        .stat-card::before {
+            content: "";
+            position: absolute;
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            right: -60px;
+            top: -70px;
+            background: rgba(255,255,255,.12);
+            filter: blur(2px);
+        }
+
+        .stat-card::after {
+            content: "";
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            right: 30px;
+            bottom: -80px;
+            background: rgba(255,255,255,.08);
+            filter: blur(5px);
+        }
+
+        .stat-waspada {
+            background: linear-gradient(135deg, #f59e0b 0%, #f97316 45%, #ea580c 100%);
+            box-shadow: 0 10px 30px rgba(245,158,11,.30);
+        }
+
+        .stat-kritis {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 45%, #991b1b 100%);
+            box-shadow: 0 10px 30px rgba(239,68,68,.30);
+        }
+
+        .stat-kadaluarsa {
+            background: linear-gradient(135deg, #475569 0%, #1e293b 50%, #020617 100%);
+            box-shadow: 0 10px 30px rgba(15,23,42,.35);
+        }
+
+        .stat-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .stat-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            opacity: .85;
+            margin-bottom: 5px;
+        }
+
+        .stat-number {
+            font-size: 48px;
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: -2px;
+            text-shadow: 0 3px 10px rgba(0,0,0,.20);
+            margin: 8px 0;
+        }
+
+        .stat-description {
+            font-size: 13px;
+            opacity: .8;
+            margin-top: 8px;
+        }
+
+        .stat-icon {
+            position: absolute;
+            z-index: 1;
+            right: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 72px;
+            height: 72px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 34px;
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.18);
+            backdrop-filter: blur(8px);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 8px 20px rgba(0,0,0,.12);
+        }
+
+        .stat-line {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,.15);
+        }
+
+        .stat-line span {
+            display: block;
+            width: 35%;
+            height: 100%;
+            background: rgba(255,255,255,.8);
+            box-shadow: 0 0 12px rgba(255,255,255,.8);
+            border-radius: 10px;
+        }
+
+        @media (max-width: 767px) {
+            .stat-card {
+                min-height: 135px;
+                padding: 20px;
+            }
+            .stat-number {
+                font-size: 40px;
+            }
+            .stat-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 28px;
+                right: 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<?php
+$current_page = basename($_SERVER['PHP_SELF']);
+?>
+
+<div class="container-fluid p-0">
+    <div class="row no-gutters min-vh-100">
+        <!-- Sidebar Column -->
+        <aside class="col-md-3 col-lg-2 text-white p-3 min-vh-100 sticky-top" style="background: linear-gradient(180deg, #0f2e50, #194c7e);">
+            <?php include "inc/sidebar.php"; ?>
+        </aside>
+        
+        <!-- Main Content Column -->
+        <main class="col-md-9 col-lg-10 p-4">
+            <div class="container-fluid">
+
+                <!-- HEADER -->
+                <div class="mb-4">
+                    <h3>Monitoring Berkas Rutin</h3>
+                    <div class="text-muted">
+                        Pemantauan berkas berdasarkan batas waktu layanan
+                    </div>
+                </div>
+
+                <!-- STATISTIK -->
+                <div class="row">
+                    <!-- WASPADA -->
+                    <div class="col-lg-4 col-md-6">
+                        <div class="stat-card stat-waspada">
+                            <div class="stat-content">
+                                <div class="stat-title">Total Waspada</div>
+                                <div class="stat-number"><?= $totalWaspada ?></div>
+                                <div class="stat-description">Berkas mendekati batas kritis</div>
+                            </div>
+                            <div class="stat-icon">⚠</div>
+                            <div class="stat-line"><span></span></div>
+                        </div>
+                    </div>
+
+                    <!-- KRITIS -->
+                    <div class="col-lg-4 col-md-6">
+                        <div class="stat-card stat-kritis">
+                            <div class="stat-content">
+                                <div class="stat-title">Total Kritis</div>
+                                <div class="stat-number"><?= $totalKritis ?></div>
+                                <div class="stat-description">Berkas mendekati jatuh tempo</div>
+                            </div>
+                            <div class="stat-icon">⛔</div>
+                            <div class="stat-line"><span></span></div>
+                        </div>
+                    </div>
+
+                    <!-- KADALUARSA -->
+                    <div class="col-lg-4 col-md-6">
+                        <div class="stat-card stat-kadaluarsa">
+                            <div class="stat-content">
+                                <div class="stat-title">Total Kadaluarsa</div>
+                                <div class="stat-number"><?= $totalKadaluarsa ?></div>
+                                <div class="stat-description">Sudah melewati jatuh tempo</div>
+                            </div>
+                            <div class="stat-icon">⏱</div>
+                            <div class="stat-line"><span></span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- REKAP BERKAS PER POSISI -->
+                <?php if (!empty($rekapPosisi)): ?>
+                <div class="card mb-5">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Ringkasan Berkas Berdasarkan Posisi</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>No.</th>
+                                        <th>Nama Posisi</th>
+                                        <th class="text-center">Waspada</th>
+                                        <th class="text-center">Kritis</th>
+                                        <th class="text-center">Kadaluarsa</th>
+                                        <th class="text-center">Total Berkas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php 
+                                    $noPos = 1;
+                                    foreach ($rekapPosisi as $namaPosisi => $jumlah): 
+                                        $totalPerPosisi = $jumlah['waspada'] + $jumlah['kritis'] + $jumlah['kadaluarsa'];
+                                        // Abaikan posisi jika semua nilainya 0
+                                        if ($totalPerPosisi === 0) continue;
+                                    ?>
+                                        <tr>
+                                            <td><?= $noPos++ ?></td>
+                                            <td><strong><?= htmlspecialchars($namaPosisi) ?></strong></td>
+                                            <td class="text-center"><span class="badge badge-warning text-white" style="background-color: #f59e0b;"><?= $jumlah['waspada'] ?></span></td>
+                                            <td class="text-center"><span class="badge badge-danger" style="background-color: #ef4444;"><?= $jumlah['kritis'] ?></span></td>
+                                            <td class="text-center"><span class="badge badge-dark" style="background-color: #1e293b;"><?= $jumlah['kadaluarsa'] ?></span></td>
+                                            <td class="text-center"><strong><?= $totalPerPosisi ?></strong></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <!-- TABEL WASPADA -->
+                <div class="card mb-5">
+                    <div class="card-header">
+                        <h5 class="judul-section">
+                            <span class="badge badge-warning">WASPADA</span>
+                            Berkas Waspada
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-waspada">
+                                <thead>
+                                    <tr>
+                                        <th>No.</th>
+                                        <th>No. Berkas</th>
+                                        <th>Nama Pemohon</th>
+                                        <th>Layanan</th>
+                                        <th>Posisi</th>
+                                        <th>Tanggal Mulai</th>
+                                        <th>Umur</th>
+                                        <th>Sisa Hari</th>
+                                        <th>PIC</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php if ($totalWaspada == 0): ?>
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted">
+                                            Tidak ada berkas dalam status waspada.
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+
+                                <?php foreach ($dataWaspada as $no => $row): ?>
+                                    <tr>
+                                        <td><?= $no + 1 ?></td>
+                                        <td>
+                                            <strong><?= htmlspecialchars($row['no_berkas']) ?>/<?= htmlspecialchars($row['tahun']) ?></strong>
+                                        </td>
+                                        <td><?= htmlspecialchars($row['nama_pemohon']) ?></td>
+                                        <td><?= htmlspecialchars($row['nama_layanan'] ?? '-') ?></td>
+                                        <td><?= htmlspecialchars($row['nama_posisi'] ?? '-') ?></td>
+                                        <td><?= htmlspecialchars($row['tanggal_mulai_formatted']) ?></td>
+                                        <td><?= $row['umur_hari'] ?> hari</td>
+                                        <td>
+                                            <span class="sisa-hari"><?= $row['sisa_hari'] ?> hari</span>
+                                        </td>
+                                        <td><?= htmlspecialchars($row['nama_pic'] ?? '-') ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TABEL KRITIS -->
+                <div class="card mb-5">
+                    <div class="card-header">
+                        <h5 class="judul-section">
+                            <span class="badge badge-danger">KRITIS</span>
+                            Berkas Kritis
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-kritis">
+                                <thead>
+                                    <tr>
+                                        <th>No.</th>
+                                        <th>No. Berkas</th>
+                                        <th>Nama Pemohon</th>
+                                        <th>Layanan</th>
+                                        <th>Posisi</th>
+                                        <th>Tanggal Mulai</th>
+                                        <th>Umur</th>
+                                        <th>Sisa Hari</th>
+                                        <th>PIC</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php if ($totalKritis == 0): ?>
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted">
+                                            Tidak ada berkas dalam status kritis.
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+
+                                <?php foreach ($dataKritis as $no => $row): ?>
+                                    <tr>
+                                        <td><?= $no + 1 ?></td>
+                                        <td>
+                                            <strong><?= htmlspecialchars($row['no_berkas']) ?>/<?= htmlspecialchars($row['tahun']) ?></strong>
+                                        </td>
+                                        <td><?= htmlspecialchars($row['nama_pemohon']) ?></td>
+                                        <td><?= htmlspecialchars($row['nama_layanan'] ?? '-') ?></td>
+                                        <td><?= htmlspecialchars($row['nama_posisi'] ?? '-') ?></td>
+                                        <td><?= htmlspecialchars($row['tanggal_mulai_formatted']) ?></td>
+                                        <td><?= $row['umur_hari'] ?> hari</td>
+                                        <td>
+                                            <span class="sisa-hari"><?= $row['sisa_hari'] ?> hari</span>
+                                        </td>
+                                        <td><?= htmlspecialchars($row['nama_pic'] ?? '-') ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TABEL KADALUARSA -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="judul-section">
+                            <span class="badge badge-dark">KADALUARSA</span>
+                            Berkas Kadaluarsa/ Jatuh tempo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-kadaluarsa">
+                                <thead>
+                                    <tr>
+                                        <th>No.</th>
+                                        <th>No. Berkas</th>
+                                        <th>Nama Pemohon</th>
+                                        <th>Layanan</th>
+                                        <th>Posisi</th>
+                                        <th>Tanggal Mulai</th>
+                                        <th>Umur</th>
+                                        <th>Terlambat</th>
+                                        <th>PIC</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php if ($totalKadaluarsa == 0): ?>
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted">
+                                            Tidak ada berkas kadaluarsa.
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+
+                                <?php foreach ($dataKadaluarsa as $no => $row): ?>
+                                    <tr>
+                                        <td><?= $no + 1 ?></td>
+                                        <td>
+                                            <strong><?= htmlspecialchars($row['no_berkas']) ?>/<?= htmlspecialchars($row['tahun']) ?></strong>
+                                        </td>
+                                        <td><?= htmlspecialchars($row['nama_pemohon']) ?></td>
+                                        <td><?= htmlspecialchars($row['nama_layanan'] ?? '-') ?></td>
+                                        <td><?= htmlspecialchars($row['nama_posisi'] ?? '-') ?></td>
+                                        <td><?= htmlspecialchars($row['tanggal_mulai_formatted']) ?></td>
+                                        <td><?= $row['umur_hari'] ?> hari</td>
+                                        <td>
+                                            <strong class="text-danger"><?= abs($row['sisa_hari']) ?> hari</strong>
+                                        </td>
+                                        <td><?= htmlspecialchars($row['nama_pic'] ?? '-') ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+
+</html>

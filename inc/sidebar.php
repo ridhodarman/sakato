@@ -26,13 +26,13 @@
     // Daftar menu beserta ikon dan tautannya
     $menus = [
         'dashboard.php'  => ['icon' => 'fas fa-th-large', 'label' => 'Dashboard'],
-        'databerkas.php' => ['icon' => 'fas fa-folder', 'label' => 'Database Berkas'],
+        'berkas.php' => ['icon' => 'fas fa-folder', 'label' => 'Database Berkas'],
         'warning.php'    => ['icon' => 'fas fa-exclamation-triangle', 'label' => 'Early Warning'],
         'eskalasi.php'   => ['icon' => 'fas fa-arrow-up-right-dots', 'label' => 'Eskalasi'],
-        'pic.php'        => ['icon' => 'fas fa-users', 'label' => 'Kinerja PIC'],
+        'kinerja.php'        => ['icon' => 'fas fa-users', 'label' => 'Kinerja PIC'],
         'input.php'      => ['icon' => 'fas fa-plus-circle', 'label' => 'Input / Update'],
-        'audit.php'      => ['icon' => 'fas fa-history', 'label' => 'Audit Trail'],
-        'setting.php'    => ['icon' => 'fas fa-cog', 'label' => 'Pengaturan']
+        // 'audit.php'      => ['icon' => 'fas fa-history', 'label' => 'Audit Trail'],
+        // 'setting.php'    => ['icon' => 'fas fa-cog', 'label' => 'Pengaturan']
     ];
 
     foreach ($menus as $file => $menu):
@@ -52,7 +52,13 @@
 
 <!-- Logout Button -->
 <div class="pt-3 mt-3 border-top" style="border-color: rgba(255,255,255,0.14) !important;">
-    <button id="logout" class="btn btn-light btn-block w-100 text-center" style="background: #eef3f8; color: #29405b; font-weight: 700;" onclick="logout()">
+    <button id="logout" class="btn btn-light btn-block w-100 text-center" style="background: #eef3f8; color: #29405b; font-weight: 700;" onclick="keluar()">
         <i class="fas fa-sign-out-alt mr-2 me-2"></i> Keluar
     </button>
 </div>
+
+<script>
+    function keluar(){
+        window.location = "act/logout.php";
+    }
+</script>

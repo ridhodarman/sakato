@@ -554,7 +554,7 @@ while ($row = mysqli_fetch_assoc($result)) {
         $sla_status = 'Kritis';
 
         $badge_class =
-            'bg-danger';
+            'bg-danger text-light';
 
     } elseif (
         $working_days_elapsed >=
@@ -571,7 +571,7 @@ while ($row = mysqli_fetch_assoc($result)) {
         $sla_status = 'Normal';
 
         $badge_class =
-            'bg-primary';
+            'bg-primary text-light';
     }
 
 

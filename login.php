@@ -11,41 +11,54 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Ambil input form
-$username = strtolower(trim($_POST['username'] ?? ''));
+$username = trim($_POST['username'] ?? '');
 $password = $_POST['password'] ?? '';
 
 // Validasi input tidak boleh kosong
-if (empty($username) || empty($password)) {
+if ($username === '' || $password === '') {
     header('Location: index.php?error=1');
     exit;
 }
 
-// Enkripsi password input dengan MD5
-$password_md5 = md5($password);
+// Cari akun berdasarkan username saja
+$stmt = $koneksi->prepare("
+    SELECT id, username, nama, password
+    FROM akun_sakato
+    WHERE username = ?
+    LIMIT 1
+");
 
-// Cari akun berdasarkan username dan password
-$stmt = $koneksi->prepare("SELECT id, username, nama FROM akun_sakato WHERE username = ? AND password = ?");
-$stmt->bind_param("ss", $username, $password_md5);
+$stmt->bind_param("s", $username);
 $stmt->execute();
+
 $result = $stmt->get_result();
 
 // Jika akun ditemukan
 if ($result->num_rows === 1) {
     $user = $result->fetch_assoc();
 
-    // Set session login
-    $_SESSION['sakato_login'] = true;
-    $_SESSION['id_user']      = $user['id'];
-    $_SESSION['username']     = $user['username'];
-    $_SESSION['nama']         = $user['nama'];
+    // Verifikasi password dengan hash yang tersimpan di database
+    if (password_verify($password, $user['password'])) {
 
-    $stmt->close();
-    header('Location: dashboard.php');
-    exit;
+        // Regenerasi session ID untuk mencegah session fixation
+        session_regenerate_id(true);
+
+        // Set session login
+        $_SESSION['sakato_login'] = true;
+        $_SESSION['id_user']      = $user['id'];
+        $_SESSION['username']     = $user['username'];
+        $_SESSION['nama']         = $user['nama'];
+
+        $stmt->close();
+
+        header('Location: dashboard.php');
+        exit;
+    }
 }
 
-// Jika username atau password salah
+// Username atau password salah
 $stmt->close();
+
 header('Location: index.php?error=1');
 exit;
 ?>

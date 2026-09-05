@@ -79,6 +79,44 @@ $result = $koneksi->query("SELECT * FROM pic ORDER BY nama");
 <?php
 // Ambil nama file dari URL yang sedang diakses (misal: "dashboard.php")
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// Ambil hak akses user yang sedang login
+$id_user = $_SESSION['id_user'] ?? 0;
+
+$stmt = $koneksi->prepare("
+    SELECT kelola_pic_akun
+    FROM akun_sakato
+    WHERE id = ?
+    LIMIT 1
+");
+
+$stmt->bind_param("i", $id_user);
+$stmt->execute();
+
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
+
+$stmt->close();
+
+// Jika tidak punya akses
+if (!$user || (int)$user['kelola_pic_akun'] !== 1) {
+
+    echo '
+    <script>
+        Swal.fire({
+            icon: "error",
+            title: "Akses Ditolak",
+            text: "Anda tidak memiliki akses untuk halaman ini, hubungi tata usaha atau admin",
+            confirmButtonText: "OK"
+        }).then(function() {
+            window.location.href = "input.php";
+        });
+    </script>
+    ';
+
+    exit;
+}
+
 ?>
 
 <div class="container-fluid p-0">

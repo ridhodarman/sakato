@@ -292,7 +292,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                name="tanggal_mulai"
                                class="form-control"
                                value="<?= date('Y-m-d') ?>"
-                               required>
+                               >
 
                     </div>
 
@@ -376,8 +376,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <!-- Pilihan Posisi Berkas Terakhir -->
                     <div class="form-group">
                         <label>Posisi Berkas Terakhir</label>
-                        <select name="posisi_id" id="edit_posisi_id" class="form-control">
-                            <option value="0">-- Pilih Posisi --</option>
+                        <select name="posisi_id" id="edit_posisi_id" class="form-control" required>
+                            <option value="">-- Pilih Posisi --</option>
                             <?php foreach ($posisi as $p): ?>
                                 <option value="<?= $p['id'] ?>">
                                     <?= htmlspecialchars($p['nama_posisi']) ?>
@@ -388,7 +388,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                     <div class="form-group">
                         <label>Tanggal Mulai</label>
-                        <input type="date" name="tanggal_mulai" id="edit_tanggal_mulai" class="form-control" required>
+                        <input type="date" name="tanggal_mulai" id="edit_tanggal_mulai" class="form-control">
                     </div>
 
                     <hr>
@@ -407,6 +407,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="form-group">
                         <label>Catatan</label>
                         <textarea name="catatan" id="edit_catatan" class="form-control" rows="4"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tujuan Eskalasi</label>
+                        <input type="text" name="tujuan_eskalasi" id="edit_tujuan_eskalasi" class="form-control" maxlength="250">
+                        <inpu
                     </div>
 
                     <div class="form-group">
@@ -696,10 +702,11 @@ $(document).on('click', '.btnUpdate', function() {
             $('#edit_tahun').val(data.tahun);
             $('#edit_nama_pemohon').val(data.nama_pemohon);
             $('#edit_layanan_id').val(data.layanan_id);
-            $('#edit_posisi_id').val(data.posisi_id ?? 0); // Set Posisi Berkas
+            $('#edit_posisi_id').val(data.posisi_id);
             $('#edit_tanggal_mulai').val(data.tanggal_mulai);
             $('#edit_status').val(data.status);
             $('#edit_catatan').val(data.catatan);
+            $('#edit_tujuan_eskalasi').val(data.tujuan_eskalasi);
             $('#edit_tanggal_selesai').val(data.tanggal_selesai);
 
             $('#modalUpdate').modal('show');

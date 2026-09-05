@@ -34,8 +34,10 @@ $sql = "
         nama_pemohon,
         tanggal_mulai,
         layanan_id,
+        posisi_id,
         status,
         catatan,
+        tujuan_eskalasi,
         tanggal_selesai
 
     FROM berkas_rutin

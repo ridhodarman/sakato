@@ -1,5 +1,78 @@
 <?php
+// Pastikan tidak ada spasi/enter di sebelum tag <?php di baris paling atas!
+ob_start(); // Mulai output buffering dari baris pertama
+
 require_once 'auth.php';
+
+// =====================================================
+// API AJAX FOR MODAL DETAIL DATA
+// =====================================================
+if (isset($_GET['action']) && $_GET['action'] === 'get_detail') {
+    // Bersihkan seluruh buffer yang terkumpul dari auth.php atau whitespace
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    header('Content-Type: application/json; charset=utf-8');
+    
+    $pic_id   = isset($_GET['pic_id']) ? (int)$_GET['pic_id'] : 0;
+    $kategori = isset($_GET['kategori']) ? $_GET['kategori'] : '';
+
+    $whereClause = "";
+    switch ($kategori) {
+        case 'proses':
+            $whereClause = "b.status = 'proses'";
+            break;
+        case 'eskalasi':
+            $whereClause = "b.status = 'eskalasi'";
+            break;
+        case 'waspada':
+            $whereClause = "b.status <> 'selesai' AND DATEDIFF(CURDATE(), b.tanggal_mulai) >= l.waspada AND DATEDIFF(CURDATE(), b.tanggal_mulai) < l.kritis";
+            break;
+        case 'kritis':
+            $whereClause = "b.status <> 'selesai' AND DATEDIFF(CURDATE(), b.tanggal_mulai) >= l.kritis AND DATEDIFF(CURDATE(), b.tanggal_mulai) <= l.jatuh_tempo";
+            break;
+        case 'kadaluarsa':
+            $whereClause = "b.status <> 'selesai' AND DATEDIFF(CURDATE(), b.tanggal_mulai) > l.jatuh_tempo";
+            break;
+        default:
+            echo json_encode([]);
+            exit;
+    }
+
+    $sqlDetail = "
+        SELECT 
+            b.no_berkas,
+            b.tahun,
+            b.nama_pemohon,
+            l.nama_layanan AS nama_layanan,
+            IF(b.tanggal_mulai IS NULL OR b.tanggal_mulai = '0000-00-00', '-', DATE_FORMAT(b.tanggal_mulai, '%d-%m-%Y')) AS tanggal_mulai_formatted,
+            IF(b.tanggal_mulai IS NULL OR b.tanggal_mulai = '0000-00-00', NULL, DATEDIFF(CURDATE(), b.tanggal_mulai)) AS umur_berkas
+        FROM berkas_rutin b
+        JOIN layanan l ON b.layanan_id = l.id
+        WHERE l.pic_id = ? AND $whereClause
+        ORDER BY b.tanggal_mulai ASC
+    ";
+
+    $stmt = $koneksi->prepare($sqlDetail);
+    if (!$stmt) {
+        echo json_encode(['error' => $koneksi->error]);
+        exit;
+    }
+
+    $stmt->bind_param("i", $pic_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+
+    $detailData = [];
+    while ($row = $res->fetch_assoc()) {
+        $detailData[] = $row;
+    }
+
+    echo json_encode($detailData);
+    exit; // Hentikan eksekusi script sepenuhnya
+}
+
 
 // =====================================================
 // DATA KINERJA PIC
@@ -232,7 +305,7 @@ foreach ($dataPIC as $row) {
             color: #0f172a;
         }
 
-        /* BADGES */
+        /* BADGES WITH CLICK FEATURE */
         .badge-custom {
             padding: 5px 9px;
             border-radius: 20px;
@@ -241,6 +314,17 @@ foreach ($dataPIC as $row) {
             display: inline-block;
             min-width: 32px;
             text-align: center;
+            border: none;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .badge-clickable {
+            cursor: pointer;
+        }
+
+        .badge-clickable:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
 
         .badge-proses { background: #eff6ff; color: #1d4ed8; }
@@ -288,14 +372,29 @@ foreach ($dataPIC as $row) {
                         </div>
                     </div>
 
-                    <div class="col-lg-3 col-md-4 col-6">
+                    <div class="col-lg-2 col-md-4 col-6">
                         <div class="stat-card stat-orange">
                             <div class="stat-title">Eskalasi</div>
                             <div class="stat-number"><?= $totalEskalasi ?></div>
-                            <div class="stat-description">Butuh pertimbangan pimpinan</div>
+                            <div class="stat-description">Butuh pertimbangan</div>
                         </div>
                     </div>
 
+                    <div class="col-lg-2 col-md-4 col-6">
+                        <div class="stat-card stat-yellow">
+                            <div class="stat-title">Waspada</div>
+                            <div class="stat-number"><?= $totalWaspada ?></div>
+                            <div class="stat-description">Mendekati tenggat</div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-3 col-md-6 col-6">
+                        <div class="stat-card stat-red-warning">
+                            <div class="stat-title">Kritis</div>
+                            <div class="stat-number"><?= $totalKritis ?></div>
+                            <div class="stat-description">Batas waktu terlampaui</div>
+                        </div>
+                    </div>
 
                     <div class="col-lg-3 col-md-6 col-6">
                         <div class="stat-card stat-red-dark">
@@ -306,7 +405,7 @@ foreach ($dataPIC as $row) {
                     </div>
                 </div>
 
-                <!-- TABEL KINERJA -->
+                <!-- TABEL KINERJA SELURUH PIC -->
                 <div class="table-card">
                     <div class="table-header">
                         <h2 class="table-title">Kinerja Seluruh PIC</h2>
@@ -335,27 +434,32 @@ foreach ($dataPIC as $row) {
                                         </div>
                                     </td>
                                     <td>
-                                        <span class="badge-custom badge-proses">
+                                        <span class="badge-custom badge-proses <?= $row['total_proses'] > 0 ? 'badge-clickable' : '' ?>" 
+                                              onclick="showDetail(<?= $row['pic_id'] ?>, 'proses', '<?= htmlspecialchars($row['nama_pic'], ENT_QUOTES) ?>', <?= $row['total_proses'] ?>)">
                                             <?= $row['total_proses'] ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge-custom badge-eskalasi">
+                                        <span class="badge-custom badge-eskalasi <?= $row['total_eskalasi'] > 0 ? 'badge-clickable' : '' ?>" 
+                                              onclick="showDetail(<?= $row['pic_id'] ?>, 'eskalasi', '<?= htmlspecialchars($row['nama_pic'], ENT_QUOTES) ?>', <?= $row['total_eskalasi'] ?>)">
                                             <?= $row['total_eskalasi'] ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge-custom badge-waspada">
+                                        <span class="badge-custom badge-waspada <?= $row['total_waspada'] > 0 ? 'badge-clickable' : '' ?>" 
+                                              onclick="showDetail(<?= $row['pic_id'] ?>, 'waspada', '<?= htmlspecialchars($row['nama_pic'], ENT_QUOTES) ?>', <?= $row['total_waspada'] ?>)">
                                             <?= $row['total_waspada'] ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge-custom badge-kritis">
+                                        <span class="badge-custom badge-kritis <?= $row['total_kritis'] > 0 ? 'badge-clickable' : '' ?>" 
+                                              onclick="showDetail(<?= $row['pic_id'] ?>, 'kritis', '<?= htmlspecialchars($row['nama_pic'], ENT_QUOTES) ?>', <?= $row['total_kritis'] ?>)">
                                             <?= $row['total_kritis'] ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <span class="badge-custom badge-kadaluarsa">
+                                        <span class="badge-custom badge-kadaluarsa <?= $row['total_kadaluarsa'] > 0 ? 'badge-clickable' : '' ?>" 
+                                              onclick="showDetail(<?= $row['pic_id'] ?>, 'kadaluarsa', '<?= htmlspecialchars($row['nama_pic'], ENT_QUOTES) ?>', <?= $row['total_kadaluarsa'] ?>)">
                                             <?= $row['total_kadaluarsa'] ?>
                                         </span>
                                     </td>
@@ -377,13 +481,112 @@ foreach ($dataPIC as $row) {
             </div>
         </main>
     </div>
-    <div id="modal" class="hidden"></div>
-    <div id="toast" class="toast hidden"></div>
-    <script src="assets/app.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => { initUser(); render(); });
-    </script>
 </div>
+
+<!-- MODAL DETAIL BERKAS (BOOTSTRAP 4) -->
+<div class="modal fade" id="modalDetailBerkas" tabindex="-1" role="dialog" aria-labelledby="modalDetailLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content" style="border-radius: 16px; border: none; overflow: hidden;">
+            <div class="modal-header" style="background: #0f172a; color: white;">
+                <h5 class="modal-title" id="modalDetailLabel">Detail Berkas</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped mb-0">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>No. Berkas/Tahun</th>
+                                <th>Nama Layanan</th>
+                                <th>Nama Pemohon</th>
+                                <th>Tanggal Mulai</th>
+                                <th>Umur Berkas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalTableBody">
+                            <!-- Populated via AJAX -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="background: #f8fafc;">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => { 
+        if (typeof initUser === 'function') initUser(); 
+        if (typeof render === 'function') render(); 
+    });
+
+function showDetail(picId, kategori, namaPic, total) {
+    if (total === 0) return;
+
+    const modalTitle = document.getElementById('modalDetailLabel');
+    const modalBody = document.getElementById('modalTableBody');
+    const currentScript = '<?= basename($_SERVER['PHP_SELF']) ?>';
+
+    modalTitle.innerText = `Detail Status '${kategori.toUpperCase()}' - PIC: ${namaPic}`;
+    modalBody.innerHTML = `<tr><td colspan="5" class="text-center p-4">Memuat data...</td></tr>`;
+
+    // Menggunakan jQuery modal bawaan Bootstrap 4
+    $('#modalDetailBerkas').modal('show');
+
+    fetch(`${currentScript}?action=get_detail&pic_id=${picId}&kategori=${kategori}`)
+        .then(async response => {
+            const text = await response.text();
+            try {
+                return JSON.parse(text);
+            } catch (err) {
+                console.error('Server response (Bukan JSON valid):', text);
+                throw err;
+            }
+        })
+        .then(data => {
+            modalBody.innerHTML = '';
+            
+            if (data.error) {
+                modalBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger p-4">Error: ${data.error}</td></tr>`;
+                return;
+            }
+
+            if (data.length === 0) {
+                modalBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted p-4">Tidak ada data berkas.</td></tr>`;
+                return;
+            }
+
+            data.forEach(item => {
+                const tanggalMulai = (item.tanggal_mulai_formatted && item.tanggal_mulai_formatted !== '00-00-0000') 
+                    ? item.tanggal_mulai_formatted 
+                    : '-';
+                    
+                const umurBerkas = (item.umur_berkas !== null && item.umur_berkas !== undefined) 
+                    ? `<span class="badge badge-info">${item.umur_berkas} Hari</span>` 
+                    : '-';
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${item.no_berkas}/${item.tahun}</strong></td>
+                    <td>${item.nama_layanan || '-'}</td>
+                    <td>${item.nama_pemohon}</td>
+                    <td>${tanggalMulai}</td>
+                    <td>${umurBerkas}</td>
+                `;
+                modalBody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching details:', error);
+            modalBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger p-4">Gagal memuat data detail. Periksa Console browser (F12).</td></tr>`;
+        });
+}
+</script>
 </body>
 
 </html>

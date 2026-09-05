@@ -119,7 +119,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-bordered table-hover mb-0">
+                        <table id="tablePosisi" class="table table-bordered table-hover mb-0">
                             <thead class="">
                                 <tr>
                                     <th width="80" class="text-center">No</th>
@@ -218,13 +218,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </div>
 </div>
 
-<!-- JS Dependencies (jQuery, Popper.js, Bootstrap 4 JS, SweetAlert2) -->
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 
 <script>
+$(document).ready(function() {
+    // Inisialisasi DataTables
+    $('#tablePosisi').DataTable({
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json"
+        }
+    });
+});
 // Alert Konfirmasi Hapus Data
 function konfirmasiHapus(id) {
     Swal.fire({
@@ -270,10 +274,6 @@ if (isset($_SESSION['swal_icon'])) {
     </div>
     <div id="modal" class="hidden"></div>
     <div id="toast" class="toast hidden"></div>
-    <script src="assets/app.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {initUser(); render();});
-    </script>
 </div>
 </div>
 </body>

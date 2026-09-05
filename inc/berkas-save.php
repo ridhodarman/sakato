@@ -39,6 +39,8 @@ $status = $_POST['status'] ?? 'proses';
 
 $catatan = trim($_POST['catatan'] ?? '');
 
+$tujuan_eskalasi = trim($_POST['tujuan_eskalasi'] ?? '');
+
 $tanggal_selesai = $_POST['tanggal_selesai'] ?? '';
 
 
@@ -70,13 +72,6 @@ if ($nama_pemohon == '') {
     exit;
 }
 
-if ($tanggal_mulai == '') {
-    echo json_encode([
-        'status' => false,
-        'message' => 'Tanggal mulai wajib diisi.'
-    ]);
-    exit;
-}
 
 if ($layanan_id <= 0) {
     echo json_encode([
@@ -163,6 +158,7 @@ $sql = "
         posisi_id = ?,
         status = ?,
         catatan = ?,
+        tujuan_eskalasi = ?,
         tanggal_selesai = ?
     WHERE id = ?
 ";
@@ -171,7 +167,7 @@ $stmt = $koneksi->prepare($sql);
 
 // Tipe parameter: i (int), i (int), s (string), s (string), i (int), i (int), s (string), s (string), s (string), i (int)
 $stmt->bind_param(
-    "iissiisssi",
+    "iissiissssi",
     $no_berkas,
     $tahun,
     $nama_pemohon,
@@ -180,6 +176,7 @@ $stmt->bind_param(
     $posisi_id,
     $status,
     $catatan,
+    $tujuan_eskalasi,
     $tanggal_selesai,
     $id
 );

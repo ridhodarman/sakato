@@ -136,10 +136,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </div>
 
     <!-- Tabel Data -->
-    <div class="card shadow-sm">
+    <div class="shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0">
+                <table class="table table-hover table-striped mb-0" id="tableLayanan">
                     <thead>
                         <tr>
                             <th>No</th>
@@ -314,6 +314,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 
 <script>
+    $(document).ready(function() {
+        // Inisialisasi DataTables
+        $('#tableLayanan').DataTable({
+            "language": {
+                "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/Indonesian.json"
+            }
+        });
+    });
     // Konfirmasi Hapus Data dengan SweetAlert2
     function confirmDelete(id) {
         Swal.fire({

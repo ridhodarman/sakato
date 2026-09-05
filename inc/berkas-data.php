@@ -144,6 +144,7 @@ $sql = "
         p.nama_posisi,
         b.status,
         b.catatan,
+        b.tujuan_eskalasi,
         b.tanggal_selesai,
         b.on_update
     FROM berkas_rutin b
@@ -215,11 +216,25 @@ while ($row = $result->fetch_assoc()) {
     }
 
     // -----------------------------------------------
+    // TANGGAL MULAI
+    // -----------------------------------------------
+    $tanggalMulai = $row['tanggal_mulai'] ?? '';
+    if ($tanggalMulai == '' || $tanggalMulai == '0000-00-00') {
+        $tanggalMulai = '-';
+    }
+    else {
+        $tanggalMulai = date("d-m-Y", strtotime($tanggalMulai));
+    }
+
+    // -----------------------------------------------
     // TANGGAL SELESAI
     // -----------------------------------------------
     $tanggalSelesai = $row['tanggal_selesai'] ?? '';
     if ($tanggalSelesai == '' || $tanggalSelesai == '0000-00-00') {
         $tanggalSelesai = '-';
+    }
+    else {
+        $tanggalSelesai = date("d-m-Y", strtotime($tanggalSelesai));
     }
 
     // -----------------------------------------------
@@ -278,10 +293,11 @@ while ($row = $result->fetch_assoc()) {
         'no' => $nomor,
         'no_berkas' => htmlspecialchars($row['no_berkas']) . '/' . htmlspecialchars($row['tahun']),
         'nama_pemohon' => htmlspecialchars($row['nama_pemohon']),
-        'tanggal_mulai' => htmlspecialchars($row['tanggal_mulai']),
+        'tanggal_mulai' => $tanggalMulai,
         'nama_layanan' => htmlspecialchars($row['nama_layanan'] ?? '-'),
         'nama_posisi' => htmlspecialchars($namaPosisi),
         'keterangan' => $keterangan,
+        'tujuan_eskalasi' => htmlspecialchars($row['tujuan_eskalasi']),
         'aksi' => $aksi
     ];
 

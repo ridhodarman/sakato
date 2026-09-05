@@ -11,12 +11,6 @@ $today = $hariIni->format('Y-m-d');
 // =====================================================
 // AMBIL DATA HARI LIBUR
 // =====================================================
-//
-// Hanya ambil hari libur yang relevan.
-// Sabtu/Minggu tidak perlu dimasukkan karena memang
-// bukan hari kerja.
-//
-
 $hariLibur = [];
 
 $sqlHariLibur = "
@@ -55,9 +49,6 @@ sort($hariLibur);
 // =====================================================
 // FUNGSI BINARY SEARCH
 // =====================================================
-//
-// Mencari posisi pertama tanggal >= target
-//
 
 function lowerBoundDate($array, $target)
 {
@@ -82,14 +73,6 @@ function lowerBoundDate($array, $target)
 // =====================================================
 // HITUNG JUMLAH HARI LIBUR DALAM RANGE
 // =====================================================
-//
-// Karena array hari libur sudah diurutkan,
-// tidak perlu memeriksa seluruh hari libur.
-//
-// Kompleksitas menjadi sangat kecil: O(log n)
-//
-
-// $hariLibur hanya berisi Senin-Jumat
 
 function countHolidayBetween(
     $startDate,
@@ -115,11 +98,6 @@ function countHolidayBetween(
         $endDate
     );
 
-    /*
-     * Karena endDate juga harus dihitung,
-     * cek apakah tanggal tersebut merupakan
-     * hari libur.
-     */
     $count = $endIndex - $startIndex;
 
     if (
@@ -136,14 +114,6 @@ function countHolidayBetween(
 // =====================================================
 // HITUNG HARI KERJA
 // =====================================================
-//
-// Senin-Jumat
-// dikurangi hari libur.
-//
-// Tanggal mulai dan tanggal akhir ikut dihitung.
-//
-// TIDAK melakukan loop setiap tanggal.
-//
 
 function getWorkingDays(
     $startDate,
@@ -151,7 +121,6 @@ function getWorkingDays(
     $hariLibur = []
 ) {
 
-    // Kosong
     if (
         empty($startDate) ||
         empty($endDate) ||
@@ -161,7 +130,6 @@ function getWorkingDays(
         return 0;
     }
 
-    // Jika tanggal akhir sebelum tanggal mulai
     if ($endDate < $startDate) {
         return 0;
     }
@@ -169,64 +137,24 @@ function getWorkingDays(
     $start = new DateTime($startDate);
     $end   = new DateTime($endDate);
 
-    /*
-     * Jumlah hari kalender inklusif
-     */
-    $totalDays =
-        (int)$start->diff($end)->days + 1;
+    $totalDays = (int)$start->diff($end)->days + 1;
+    $fullWeeks = intdiv($totalDays, 7);
+    $workingDays = $fullWeeks * 5;
+    $remainingDays = $totalDays % 7;
+    $startDay = (int)$start->format('N');
 
-    /*
-     * Minggu penuh
-     */
-    $fullWeeks =
-        intdiv($totalDays, 7);
-
-    /*
-     * Hari kerja dari minggu penuh
-     */
-    $workingDays =
-        $fullWeeks * 5;
-
-    /*
-     * Sisa hari
-     */
-    $remainingDays =
-        $totalDays % 7;
-
-    /*
-     * 1 = Senin
-     * 5 = Jumat
-     * 6 = Sabtu
-     * 7 = Minggu
-     */
-    $startDay =
-        (int)$start->format('N');
-
-    /*
-     * Hitung hari kerja pada sisa hari.
-     * Maksimal hanya 6 kali loop,
-     * bukan loop seluruh tanggal.
-     */
     for ($i = 0; $i < $remainingDays; $i++) {
-
-        $day =
-            (($startDay - 1 + $i) % 7) + 1;
-
+        $day = (($startDay - 1 + $i) % 7) + 1;
         if ($day <= 5) {
             $workingDays++;
         }
     }
 
-    /*
-     * Kurangi hari libur yang jatuh
-     * pada rentang tersebut.
-     */
-    $jumlahHariLibur =
-        countHolidayBetween(
-            $startDate,
-            $endDate,
-            $hariLibur
-        );
+    $jumlahHariLibur = countHolidayBetween(
+        $startDate,
+        $endDate,
+        $hariLibur
+    );
 
     $workingDays -= $jumlahHariLibur;
 
@@ -237,12 +165,6 @@ function getWorkingDays(
 // =====================================================
 // AMBIL DATA BERKAS
 // =====================================================
-//
-// 0000-00-00 dianggap kosong.
-//
-// Dengan kondisi ini database tidak mengirimkan
-// berkas yang memang tidak mempunyai tanggal mulai.
-//
 
 $sql = "
     SELECT
@@ -302,15 +224,7 @@ $dataKritis = [];
 $dataKadaluarsa = [];
 
 $rekapPosisi = [];
-
-
-// =====================================================
-// CACHE PERHITUNGAN UMUR
-// =====================================================
-//
-// Jika banyak berkas memiliki tanggal mulai yang sama,
-// perhitungan hari kerja cukup dilakukan satu kali.
-//
+$rekapPosisiDetail = []; // Menyimpan detail list berkas per posisi & kategori
 
 $umurCache = [];
 
@@ -321,15 +235,8 @@ $umurCache = [];
 
 while ($row = $result->fetch_assoc()) {
 
-    $tanggalMulaiString =
-        $row['tanggal_mulai'] ?? '';
+    $tanggalMulaiString = $row['tanggal_mulai'] ?? '';
 
-    /*
-     * Pengaman tambahan.
-     *
-     * Walaupun sudah difilter SQL,
-     * tetap cek di PHP.
-     */
     if (
         empty($tanggalMulaiString) ||
         $tanggalMulaiString === '0000-00-00'
@@ -337,160 +244,87 @@ while ($row = $result->fetch_assoc()) {
         continue;
     }
 
+    $tanggalMulai = new DateTime($tanggalMulaiString);
+    $row['tanggal_mulai_formatted'] = $tanggalMulai->format('d-m-Y');
 
-    // =================================================
-    // FORMAT TANGGAL
-    // =================================================
-
-    $tanggalMulai =
-        new DateTime($tanggalMulaiString);
-
-    $row['tanggal_mulai_formatted'] =
-        $tanggalMulai->format('d-m-Y');
-
-
-    // =================================================
-    // HITUNG UMUR BERKAS
-    // =================================================
-
-    /*
-     * Gunakan cache.
-     */
     if (isset($umurCache[$tanggalMulaiString])) {
-
-        $umurHari =
-            $umurCache[$tanggalMulaiString];
-
+        $umurHari = $umurCache[$tanggalMulaiString];
     } else {
-
-        $umurHari =
-            getWorkingDays(
-                $tanggalMulaiString,
-                $today,
-                $hariLibur
-            );
-
-        $umurCache[$tanggalMulaiString] =
-            $umurHari;
+        $umurHari = getWorkingDays(
+            $tanggalMulaiString,
+            $today,
+            $hariLibur
+        );
+        $umurCache[$tanggalMulaiString] = $umurHari;
     }
 
+    $waspada = (int)($row['waspada'] ?? 0);
+    $kritis = (int)($row['kritis'] ?? 0);
+    $jatuhTempo = (int)($row['jatuh_tempo'] ?? 0);
 
-    // =================================================
-    // BATAS LAYANAN
-    // =================================================
-
-    $waspada =
-        (int)($row['waspada'] ?? 0);
-
-    $kritis =
-        (int)($row['kritis'] ?? 0);
-
-    $jatuhTempo =
-        (int)($row['jatuh_tempo'] ?? 0);
-
-
-    /*
-     * Jika layanan tidak mempunyai
-     * jatuh tempo, tidak perlu diproses.
-     */
     if ($jatuhTempo <= 0) {
         continue;
     }
 
-
-    // =================================================
-    // SISA HARI
-    // =================================================
-
-    $sisaHari =
-        $jatuhTempo - $umurHari;
-
-
-    // =================================================
-    // PENENTUAN KATEGORI
-    // =================================================
+    $sisaHari = $jatuhTempo - $umurHari;
 
     if ($umurHari > $jatuhTempo) {
-
         $kategori = 'kadaluarsa';
-
     } elseif ($umurHari >= $kritis) {
-
         $kategori = 'kritis';
-
     } elseif ($umurHari >= $waspada) {
-
         $kategori = 'waspada';
-
     } else {
-
-        /*
-         * Masih normal.
-         * Tidak perlu dimasukkan ke tabel.
-         */
         continue;
     }
 
+    $row['umur_hari'] = $umurHari;
+    $row['sisa_hari'] = $sisaHari;
+    $row['kategori'] = $kategori;
 
-    // =================================================
-    // SIMPAN HASIL
-    // =================================================
-
-    $row['umur_hari'] =
-        $umurHari;
-
-    $row['sisa_hari'] =
-        $sisaHari;
-
-    $row['kategori'] =
-        $kategori;
-
-
-    // =================================================
-    // REKAP POSISI
-    // =================================================
-
-    $posisiNama =
-        !empty($row['nama_posisi'])
-        ? $row['nama_posisi']
-        : 'Tanpa Posisi';
-
+    $posisiNama = !empty($row['nama_posisi']) ? $row['nama_posisi'] : 'Tanpa Posisi';
 
     if (!isset($rekapPosisi[$posisiNama])) {
-
         $rekapPosisi[$posisiNama] = [
-
             'waspada' => 0,
-
             'kritis' => 0,
-
             'kadaluarsa' => 0
+        ];
+        
+        $rekapPosisiDetail[$posisiNama] = [
+            'waspada' => [],
+            'kritis' => [],
+            'kadaluarsa' => [],
+            'total' => []
         ];
     }
 
-
-    // =================================================
-    // MASUKKAN KE KATEGORI
-    // =================================================
+    // Format data ringkas untuk Modal (Menambahkan nama_layanan)
+    $itemModal = [
+        'no_berkas_tahun' => $row['no_berkas'] . '/' . $row['tahun'],
+        'nama_pemohon'   => $row['nama_pemohon'],
+        'nama_layanan'   => $row['nama_layanan'] ?? '-',
+        'tanggal_mulai'  => $row['tanggal_mulai_formatted'],
+        'umur_hari'      => $row['umur_hari'] . ' hari',
+        'kategori'       => ucfirst($kategori)
+    ];
 
     if ($kategori === 'waspada') {
-
         $dataWaspada[] = $row;
-
         $rekapPosisi[$posisiNama]['waspada']++;
-
+        $rekapPosisiDetail[$posisiNama]['waspada'][] = $itemModal;
     } elseif ($kategori === 'kritis') {
-
         $dataKritis[] = $row;
-
         $rekapPosisi[$posisiNama]['kritis']++;
-
+        $rekapPosisiDetail[$posisiNama]['kritis'][] = $itemModal;
     } elseif ($kategori === 'kadaluarsa') {
-
         $dataKadaluarsa[] = $row;
-
         $rekapPosisi[$posisiNama]['kadaluarsa']++;
+        $rekapPosisiDetail[$posisiNama]['kadaluarsa'][] = $itemModal;
     }
+    
+    // Tambahkan ke daftar total per posisi
+    $rekapPosisiDetail[$posisiNama]['total'][] = $itemModal;
 }
 
 
@@ -498,14 +332,9 @@ while ($row = $result->fetch_assoc()) {
 // TOTAL KESELURUHAN
 // =====================================================
 
-$totalWaspada =
-    count($dataWaspada);
-
-$totalKritis =
-    count($dataKritis);
-
-$totalKadaluarsa =
-    count($dataKadaluarsa);
+$totalWaspada = count($dataWaspada);
+$totalKritis = count($dataKritis);
+$totalKadaluarsa = count($dataKadaluarsa);
 
 ?>
 <!doctype html>
@@ -640,6 +469,17 @@ $totalKadaluarsa =
             border-radius: 10px;
         }
 
+        /* Styling Badge Interaktif */
+        .btn-modal-trigger {
+            cursor: pointer;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            display: inline-block;
+        }
+        .btn-modal-trigger:hover {
+            transform: scale(1.15);
+            opacity: 0.9;
+        }
+
         @media (max-width: 767px) {
             .stat-card {
                 min-height: 135px;
@@ -675,10 +515,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <div class="container-fluid">
 
                 <!-- HEADER -->
-                <div class="mb-4">
-                    <h3>Monitoring Berkas Rutin</h3>
-                    <div class="text-muted">
-                        Pemantauan berkas berdasarkan batas waktu layanan
+                <div class="mb-4 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-1">Monitoring Berkas Rutin</h3>
+                        <div class="text-muted">
+                            Pemantauan berkas berdasarkan batas waktu layanan
+                        </div>
+                    </div>
+                    <div>
+                        <a href="act/warning_export_excel.php" target="_blank" class="btn btn-success font-weight-bold shadow-sm">
+                            <i class="fas fa-file-excel mr-1"></i> Export ke Excel
+                        </a>
                     </div>
                 </div>
 
@@ -748,16 +595,74 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                     $noPos = 1;
                                     foreach ($rekapPosisi as $namaPosisi => $jumlah): 
                                         $totalPerPosisi = $jumlah['waspada'] + $jumlah['kritis'] + $jumlah['kadaluarsa'];
-                                        // Abaikan posisi jika semua nilainya 0
                                         if ($totalPerPosisi === 0) continue;
+
+                                        // Data JSON untuk dikirim ke modal
+                                        $jsonWaspada    = htmlspecialchars(json_encode($rekapPosisiDetail[$namaPosisi]['waspada']), ENT_QUOTES, 'UTF-8');
+                                        $jsonKritis     = htmlspecialchars(json_encode($rekapPosisiDetail[$namaPosisi]['kritis']), ENT_QUOTES, 'UTF-8');
+                                        $jsonKadaluarsa = htmlspecialchars(json_encode($rekapPosisiDetail[$namaPosisi]['kadaluarsa']), ENT_QUOTES, 'UTF-8');
+                                        $jsonTotal      = htmlspecialchars(json_encode($rekapPosisiDetail[$namaPosisi]['total']), ENT_QUOTES, 'UTF-8');
+                                        $namaPosisiAttr = htmlspecialchars($namaPosisi, ENT_QUOTES, 'UTF-8');
                                     ?>
                                         <tr>
                                             <td><?= $noPos++ ?></td>
                                             <td><strong><?= htmlspecialchars($namaPosisi) ?></strong></td>
-                                            <td class="text-center"><span class="badge badge-warning text-white" style="background-color: #f59e0b;"><?= $jumlah['waspada'] ?></span></td>
-                                            <td class="text-center"><span class="badge badge-danger" style="background-color: #ef4444;"><?= $jumlah['kritis'] ?></span></td>
-                                            <td class="text-center"><span class="badge badge-dark" style="background-color: #1e293b;"><?= $jumlah['kadaluarsa'] ?></span></td>
-                                            <td class="text-center"><strong><?= $totalPerPosisi ?></strong></td>
+                                            
+                                            <!-- WASPADA -->
+                                            <td class="text-center">
+                                                <?php if ($jumlah['waspada'] > 0): ?>
+                                                    <span class="badge badge-primary text-white btn-modal-trigger" 
+                                                          data-posisi="<?= $namaPosisiAttr ?>"
+                                                          data-kategori="Waspada"
+                                                          data-items='<?= $jsonWaspada ?>'>
+                                                        <?= $jumlah['waspada'] ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-secondary">0</span>
+                                                <?php endif; ?>
+                                            </td>
+
+                                            <!-- KRITIS -->
+                                            <td class="text-center">
+                                                <?php if ($jumlah['kritis'] > 0): ?>
+                                                    <span class="badge badge-warning btn-modal-trigger" 
+                                                          data-posisi="<?= $namaPosisiAttr ?>"
+                                                          data-kategori="Kritis"
+                                                          data-items='<?= $jsonKritis ?>'>
+                                                        <?= $jumlah['kritis'] ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-secondary">0</span>
+                                                <?php endif; ?>
+                                            </td>
+
+                                            <!-- KADALUARSA -->
+                                            <td class="text-center">
+                                                <?php if ($jumlah['kadaluarsa'] > 0): ?>
+                                                    <span class="badge badge-danger btn-modal-trigger" 
+                                                          data-posisi="<?= $namaPosisiAttr ?>"
+                                                          data-kategori="Kadaluarsa"
+                                                          data-items='<?= $jsonKadaluarsa ?>'>
+                                                        <?= $jumlah['kadaluarsa'] ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge badge-secondary">0</span>
+                                                <?php endif; ?>
+                                            </td>
+
+                                            <!-- TOTAL BERKAS -->
+                                            <td class="text-center">
+                                                <?php if ($totalPerPosisi > 0): ?>
+                                                    <span class="badge badge-dark btn-modal-trigger" 
+                                                          data-posisi="<?= $namaPosisiAttr ?>"
+                                                          data-kategori="Total Berkas"
+                                                          data-items='<?= $jsonTotal ?>'>
+                                                        <?= $totalPerPosisi ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <strong>0</strong>
+                                                <?php endif; ?>
+                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -880,11 +785,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
 
                 <!-- TABEL KADALUARSA -->
-                <div class="card">
+                <div class="card mb-5">
                     <div class="card-header">
                         <h5 class="judul-section">
                             <span class="badge badge-dark">KADALUARSA</span>
-                            Berkas Kadaluarsa/ Jatuh tempo
+                            Berkas Kadaluarsa
                         </h5>
                     </div>
                     <div class="card-body">
@@ -899,7 +804,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                         <th>Posisi</th>
                                         <th>Tanggal Mulai</th>
                                         <th>Umur</th>
-                                        <th>Terlambat</th>
+                                        <th>Lewat</th>
                                         <th>PIC</th>
                                     </tr>
                                 </thead>
@@ -907,7 +812,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 <?php if ($totalKadaluarsa == 0): ?>
                                     <tr>
                                         <td colspan="9" class="text-center text-muted">
-                                            Tidak ada berkas kadaluarsa.
+                                            Tidak ada berkas dalam status kadaluarsa.
                                         </td>
                                     </tr>
                                 <?php endif; ?>
@@ -924,7 +829,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                         <td><?= htmlspecialchars($row['tanggal_mulai_formatted']) ?></td>
                                         <td><?= $row['umur_hari'] ?> hari</td>
                                         <td>
-                                            <strong class="text-danger"><?= abs($row['sisa_hari']) ?> hari</strong>
+                                            <span class="text-danger">Terlambat <?= -1*$row['sisa_hari'] ?> hari</span>
                                         </td>
                                         <td><?= htmlspecialchars($row['nama_pic'] ?? '-') ?></td>
                                     </tr>
@@ -939,6 +844,83 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </main>
     </div>
 </div>
-</body>
 
+<!-- MODAL DETAIL BERKAS PER POSISI -->
+<div class="modal fade" id="modalDetailPosisi" tabindex="-1" role="dialog" aria-labelledby="modalDetailPosisiTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDetailPosisiTitle">Detail Berkas</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered table-hover mb-0">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>No.</th>
+                                <th>No. Berkas</th>
+                                <th>Nama Pemohon</th>
+                                <th>Layanan</th>
+                                <th>Tanggal Mulai</th>
+                                <th>Umur</th>
+                                <th>Kategori</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalTableBody">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    $('.btn-modal-trigger').on('click', function() {
+        const posisi = $(this).data('posisi');
+        const kategori = $(this).data('kategori');
+        const items = $(this).data('items');
+
+        $('#modalDetailPosisiTitle').text('Detail Berkas - ' + posisi + ' (' + kategori + ')');
+
+        let html = '';
+        if (items && items.length > 0) {
+            items.forEach((item, index) => {
+                let badgeClass = 'badge-secondary';
+                if (item.kategori === 'Waspada') badgeClass = 'badge-primary';
+                else if (item.kategori === 'Kritis') badgeClass = 'badge-warning';
+                else if (item.kategori === 'Kadaluarsa') badgeClass = 'badge-danger';
+
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td><strong>${item.no_berkas_tahun}</strong></td>
+                        <td>${item.nama_pemohon}</td>
+                        <td>${item.nama_layanan}</td>
+                        <td>${item.tanggal_mulai}</td>
+                        <td>${item.umur_hari}</td>
+                        <td><span class="badge ${badgeClass}">${item.kategori}</span></td>
+                    </tr>
+                `;
+            });
+        } else {
+            html = `<tr><td colspan="7" class="text-center text-muted">Tidak ada berkas.</td></tr>`;
+        }
+
+        $('#modalTableBody').html(html);
+        $('#modalDetailPosisi').modal('show');
+    });
+});
+</script>
+
+</body>
 </html>

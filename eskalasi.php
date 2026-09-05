@@ -2,6 +2,44 @@
 require_once 'auth.php';
 
 // =====================================================
+// PROSES SELESAI ESKALASI
+// =====================================================
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['selesai_id'])) {
+
+    $id = (int) $_POST['selesai_id'];
+
+    if ($id > 0) {
+
+        $stmt = $koneksi->prepare("
+            UPDATE berkas_rutin
+            SET
+                status = 'proses',
+                tujuan_eskalasi = ''
+            WHERE
+                id = ?
+                AND status = 'eskalasi'
+        ");
+
+        if (!$stmt) {
+            die("Prepare gagal: " . $koneksi->error);
+        }
+
+        $stmt->bind_param("i", $id);
+
+        if (!$stmt->execute()) {
+            die("Update gagal: " . $stmt->error);
+        }
+
+        $stmt->close();
+    }
+
+    // Kembali ke halaman ini agar tidak terjadi resubmit ketika refresh
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+// =====================================================
 // TANGGAL HARI INI
 // =====================================================
 
@@ -96,6 +134,7 @@ $sql = "
         b.tanggal_mulai,
         b.status,
         b.catatan,
+        b.tujuan_eskalasi,
         b.tanggal_selesai,
 
         l.nama_layanan,
@@ -1383,6 +1422,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                         </th>
 
+                        <th>
+                            Aksi
+                        </th>
+
 
                     </tr>
 
@@ -1460,6 +1503,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         if ($catatan == '') {
 
                             $catatan = 'Belum ada catatan eskalasi.';
+
+                        }
+
+                        $tujuan_eskalasi = trim($row['tujuan_eskalasi'] ?? '');
+
+                        if ($tujuan_eskalasi == '') {
+
+                            $tujuan_eskalasi = 'tujuan eskalasi belum di-input.';
 
                         }
 
@@ -1542,8 +1593,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <!-- TANGGAL -->
 
                             <td>
-
-                                <?= htmlspecialchars($row['tanggal_mulai']) ?>
+                            <?php
+                                $tanggalMulai = $row['tanggal_mulai'] ?? '';
+                                if ($tanggalMulai == '' || $tanggalMulai == '0000-00-00') {
+                                    $tanggalMulai = '-';
+                                }
+                                else {
+                                    $tanggalMulai = date("d-m-Y", strtotime($tanggalMulai));
+                                }
+                                echo $tanggalMulai ;
+                            ?>
 
                             </td>
 
@@ -1618,6 +1677,30 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                     </div>
 
                                 </div>
+                                <strong>Tujuan Eskalasi: </strong><?= nl2br(htmlspecialchars($tujuan_eskalasi)) ?>
+
+                            </td>
+
+                                                    <!-- AKSI -->
+
+                            <td>
+
+                                <form method="POST" class="form-selesai">
+
+                                    <input
+                                        type="hidden"
+                                        name="selesai_id"
+                                        value="<?= (int)$row['id'] ?>"
+                                    >
+
+                                    <button
+                                        type="submit"
+                                        class="btn btn-success btn-sm btn-detail"
+                                    >
+                                        ✓ Selesai
+                                    </button>
+
+                                </form>
 
                             </td>
 
@@ -1645,14 +1728,42 @@ $current_page = basename($_SERVER['PHP_SELF']);
 </div>
         </main>
     </div>
-    <div id="modal" class="hidden"></div>
-    <div id="toast" class="toast hidden"></div>
-    <script src="assets/app.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {initUser(); render();});
-    </script>
 </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    document.querySelectorAll('.form-selesai').forEach(function (form) {
+
+        form.addEventListener('submit', function (e) {
+
+            e.preventDefault();
+
+            Swal.fire({
+                title: 'Selesaikan Eskalasi?',
+                text: 'Status berkas akan dikembalikan menjadi PROSES.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Selesai',
+                cancelButtonText: 'Batal',
+                reverseButtons: true,
+                focusCancel: true
+            }).then((result) => {
+
+                if (result.isConfirmed) {
+
+                    form.submit();
+
+                }
+
+            });
+
+        });
+
+    });
+
+});
+</script>
 </body>
 
 </html>

@@ -1,12 +1,3 @@
-<!-- Tombol buka sidebar di HP -->
-<button type="button" class="btn btn-primary sidebar-toggle" id="sidebarToggle">
-    <i class="fas fa-bars"></i>
-</button>
-
-<!-- Overlay khusus HP -->
-<div class="sidebar-overlay" id="sidebarOverlay"></div>
-
-<aside class="menusidebar text-white">
 <?php
 // =========================================================
 // DATA USER LOGIN
@@ -303,18 +294,7 @@ if (isset($koneksi) && $id_user >= 0) {
                 (int)$menu['badge'] > 0
             ): ?>
 
-                <span class="badge <?= htmlspecialchars($menu['badge_class']); ?>
-                             ml-auto"
-                      style="
-                          min-width: 22px;
-                          height: 22px;
-                          padding: 3px 6px;
-                          border-radius: 11px;
-                          font-size: 11px;
-                          display: inline-flex;
-                          align-items: center;
-                          justify-content: center;
-                      ">
+                <span class="badge <?= htmlspecialchars($menu['badge_class']); ?> menu-badge">
 
                     <?= (int)$menu['badge']; ?>
 
@@ -362,54 +342,71 @@ if (isset($koneksi) && $id_user >= 0) {
      ===================================================== -->
 
 <script>
-
-function keluar() {
-    window.location = "act/logout.php";
-}
-
-
-// =========================================================
-// SIDEBAR MOBILE
-// =========================================================
-
 document.addEventListener('DOMContentLoaded', function () {
 
     const sidebar = document.querySelector('.menusidebar');
     const toggle = document.getElementById('sidebarToggle');
     const overlay = document.getElementById('sidebarOverlay');
+    const icon = document.getElementById('sidebarToggleIcon');
 
-    if (!sidebar || !toggle || !overlay) {
+    if (!sidebar || !toggle || !overlay || !icon) {
         return;
     }
 
 
-    // Buka sidebar
+    // =====================================================
+    // BUKA / TUTUP SIDEBAR
+    // =====================================================
+
     toggle.addEventListener('click', function () {
 
-        sidebar.classList.add('sidebar-open');
-        overlay.classList.add('active');
+        const isOpen = sidebar.classList.toggle('sidebar-open');
+
+        overlay.classList.toggle('active', isOpen);
+
+        if (isOpen) {
+
+            // Ubah ☰ menjadi X
+            icon.classList.remove('fa-bars');
+            icon.classList.add('fa-times');
+
+            toggle.setAttribute('aria-label', 'Tutup menu');
+
+        } else {
+
+            // Ubah X menjadi ☰
+            icon.classList.remove('fa-times');
+            icon.classList.add('fa-bars');
+
+            toggle.setAttribute('aria-label', 'Buka menu');
+
+        }
 
     });
 
 
-    // Tutup sidebar
+    // =====================================================
+    // TUTUP KLIK OVERLAY
+    // =====================================================
+
     overlay.addEventListener('click', function () {
 
-        sidebar.classList.remove('sidebar-open');
-        overlay.classList.remove('active');
+        tutupSidebar();
 
     });
 
 
-    // Klik menu -> tutup sidebar di HP
+    // =====================================================
+    // TUTUP KLIK MENU
+    // =====================================================
+
     sidebar.querySelectorAll('.nav-link').forEach(function (link) {
 
         link.addEventListener('click', function () {
 
             if (window.innerWidth <= 767) {
 
-                sidebar.classList.remove('sidebar-open');
-                overlay.classList.remove('active');
+                tutupSidebar();
 
             }
 
@@ -418,13 +415,47 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
-    // Jika layar berubah menjadi desktop
+    // =====================================================
+    // TUTUP DENGAN ESC
+    // =====================================================
+
+    document.addEventListener('keydown', function (event) {
+
+        if (event.key === 'Escape') {
+
+            tutupSidebar();
+
+        }
+
+    });
+
+
+    // =====================================================
+    // FUNGSI TUTUP SIDEBAR
+    // =====================================================
+
+    function tutupSidebar() {
+
+        sidebar.classList.remove('sidebar-open');
+        overlay.classList.remove('active');
+
+        icon.classList.remove('fa-times');
+        icon.classList.add('fa-bars');
+
+        toggle.setAttribute('aria-label', 'Buka menu');
+
+    }
+
+
+    // =====================================================
+    // JIKA KEMBALI KE DESKTOP
+    // =====================================================
+
     window.addEventListener('resize', function () {
 
         if (window.innerWidth > 767) {
 
-            sidebar.classList.remove('sidebar-open');
-            overlay.classList.remove('active');
+            tutupSidebar();
 
         }
 
@@ -432,5 +463,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
 });
 
+
+function keluar() {
+    window.location.href = "act/logout.php";
+}
 </script>
-</aside>

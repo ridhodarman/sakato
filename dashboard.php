@@ -319,7 +319,7 @@ $ontime_rate = ($total_selesai_eval > 0)
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>SAKATO V2 - Kinerja PIC</title>
+    <title>SAKATO</title>
     <?php include "inc/head.php" ?>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -353,16 +353,48 @@ $ontime_rate = ($total_selesai_eval > 0)
 </head>
 
 <body>
+<?php
+// Ambil nama file dari URL yang sedang diakses (misal: "dashboard.php")
+$current_page = basename($_SERVER['PHP_SELF']);
+?>
 <div class="container-fluid p-0">
     <div class="row no-gutters min-vh-100">
-        <!-- Sidebar -->
-        <?php $current_page = basename($_SERVER['PHP_SELF']); ?>
-        <aside class="col-md-3 col-lg-2 text-white p-3 menusidebar">
+
+        <!-- =====================================================
+             SIDEBAR DESKTOP / MOBILE
+             ===================================================== -->
+
+        <aside class="menusidebar">
+
             <?php include "inc/sidebar.php"; ?>
+
         </aside>
 
+
+        <!-- =====================================================
+             OVERLAY MOBILE
+             ===================================================== -->
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+
+        <!-- =====================================================
+             MAIN CONTENT
+             ===================================================== -->
+
+        <main class="main-content">
+
+            <!-- Tombol hamburger khusus HP -->
+            <button type="button"
+                    class="btn btn-primary sidebar-toggle"
+                    id="sidebarToggle"
+                    aria-label="Buka menu">
+
+                <i class="fas fa-bars" id="sidebarToggleIcon"></i>
+
+            </button>
+
         <!-- Main Content -->
-        <main class="col-md-9 col-lg-10 p-4">
             <div class="container-fluid py-2">
 
                 <!-- Header -->

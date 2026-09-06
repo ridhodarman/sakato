@@ -71,7 +71,7 @@ $result = $koneksi->query("SELECT * FROM pic ORDER BY nama");
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>SAKATO V2 - Kinerja PIC</title>
+    <title>SAKATO</title>
     <?php include "inc/head.php" ?>
 </head>
 
@@ -121,11 +121,40 @@ if (!$user || (int)$user['kelola_pic_akun'] !== 1) {
 
 <div class="container-fluid p-0">
     <div class="row no-gutters min-vh-100">
-        <!-- Sidebar Column -->
+
+        <!-- =====================================================
+             SIDEBAR DESKTOP / MOBILE
+             ===================================================== -->
+
+        <aside class="menusidebar">
+
             <?php include "inc/sidebar.php"; ?>
-        
-        <!-- Main Content Column -->
-        <main class="col-md-9 col-lg-10 p-4">
+
+        </aside>
+
+
+        <!-- =====================================================
+             OVERLAY MOBILE
+             ===================================================== -->
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+
+        <!-- =====================================================
+             MAIN CONTENT
+             ===================================================== -->
+
+        <main class="main-content">
+
+            <!-- Tombol hamburger khusus HP -->
+            <button type="button"
+                    class="btn btn-primary sidebar-toggle"
+                    id="sidebarToggle"
+                    aria-label="Buka menu">
+
+                <i class="fas fa-bars" id="sidebarToggleIcon"></i>
+
+            </button>
 <div class="container py-5">
     <div class="row mb-4">
         <div class="col-md-8">

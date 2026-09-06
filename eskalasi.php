@@ -995,9 +995,7 @@ $stmtSayaList->close();
     content="width=device-width,initial-scale=1"
 >
 
-<title>
-    SAKATO V2 - Kinerja PIC
-</title>
+<title>SAKATO</title>
 
 <?php include "inc/head.php" ?>
 
@@ -1877,27 +1875,41 @@ $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
 <div class="container-fluid p-0">
+    <div class="row no-gutters min-vh-100">
+
+        <!-- =====================================================
+             SIDEBAR DESKTOP / MOBILE
+             ===================================================== -->
+
+        <aside class="menusidebar">
+
+            <?php include "inc/sidebar.php"; ?>
+
+        </aside>
 
 
-<div class="row no-gutters min-vh-100">
+        <!-- =====================================================
+             OVERLAY MOBILE
+             ===================================================== -->
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
 
-    <!-- =================================================
-         SIDEBAR
-         ================================================= -->
+        <!-- =====================================================
+             MAIN CONTENT
+             ===================================================== -->
 
-    <aside class="col-md-3 col-lg-2 text-white p-3 menusidebar">
+        <main class="main-content">
 
-        <?php include "inc/sidebar.php"; ?>
+            <!-- Tombol hamburger khusus HP -->
+            <button type="button"
+                    class="btn btn-primary sidebar-toggle"
+                    id="sidebarToggle"
+                    aria-label="Buka menu">
 
-    </aside>
+                <i class="fas fa-bars" id="sidebarToggleIcon"></i>
 
-
-    <!-- =================================================
-         MAIN
-         ================================================= -->
-
-    <main class="col-md-9 col-lg-10 p-4">
+            </button>
 
 
         <div class="container-fluid">

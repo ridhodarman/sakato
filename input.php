@@ -7,7 +7,7 @@ require_once 'auth.php';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>SAKATO V2 - Kinerja PIC</title>
+    <title>SAKATO</title>
     <link rel="stylesheet" href="assets/style.css">
     <?php include "inc/head.php" ?>
 </head>
@@ -19,21 +19,46 @@ $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <div class="container-fluid p-0">
     <div class="row no-gutters min-vh-100">
-        <!-- Sidebar Column -->
-        <aside class="col-md-3 col-lg-2 text-white p-3 menusidebar">
+
+        <!-- =====================================================
+             SIDEBAR DESKTOP / MOBILE
+             ===================================================== -->
+
+        <aside class="menusidebar">
+
             <?php include "inc/sidebar.php"; ?>
+
         </aside>
-        
-        <!-- Main Content Column -->
-        <main class="col-md-9 col-lg-10 p-4">
-<!-- Tambahkan CDNs FontAwesome & Bootstrap Icons jika belum ada -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+
+        <!-- =====================================================
+             OVERLAY MOBILE
+             ===================================================== -->
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+
+        <!-- =====================================================
+             MAIN CONTENT
+             ===================================================== -->
+
+        <main class="main-content">
+
+            <!-- Tombol hamburger khusus HP -->
+            <button type="button"
+                    class="btn btn-primary sidebar-toggle"
+                    id="sidebarToggle"
+                    aria-label="Buka menu">
+
+                <i class="fas fa-bars" id="sidebarToggleIcon"></i>
+
+            </button>
 
 <!-- Container Menu Cards -->
 <div class="row g-4 py-4 justify-content-center">
     
     <!-- Menu Card 1: Kelola Data PIC -->
-    <div class="col-12 col-md-6 col-lg-5">
+    <div class="col-12 col-md-6 col-lg-5 mt-5">
         <a href="pic.php" class="text-decoration-none">
             <div class="card h-100 border-0 text-white rounded-4 overflow-hidden position-relative p-4 card-futuristic card-pic">
                 <!-- Overlay Gradient Glowing -->
@@ -67,7 +92,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </div>
 
     <!-- Menu Card 2: Kelola Data Layanan -->
-    <div class="col-12 col-md-6 col-lg-5">
+    <div class="col-12 col-md-6 col-lg-5 mt-5">
         <a href="layanan.php" class="text-decoration-none">
             <div class="card h-100 border-0 text-white rounded-4 overflow-hidden position-relative p-4 card-futuristic card-layanan">
                 <!-- Overlay Gradient Glowing -->

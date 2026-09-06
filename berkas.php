@@ -490,8 +490,6 @@ $(document).ready(function () {
 
         serverSide: true,
 
-        responsive: true,
-
         pageLength: 50,
 
         lengthMenu: [

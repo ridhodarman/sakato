@@ -275,10 +275,7 @@ $error = isset($_GET['error']) ? $_GET['error'] : '';
           </button>
         </form>
 
-        <div class="demo-info">
-          <strong>Akun Demo:</strong><br>
-          Username: <code>admin</code> | Password: <code>admin</code>
-        </div>
+        
       </div>
 
     </div>

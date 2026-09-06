@@ -93,8 +93,8 @@ $stmt = $koneksi->prepare("
 $stmt->bind_param("i", $id_user);
 $stmt->execute();
 
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
+$result_akses = $stmt->get_result();
+$user = $result_akses->fetch_assoc();
 
 $stmt->close();
 
@@ -122,9 +122,7 @@ if (!$user || (int)$user['kelola_pic_akun'] !== 1) {
 <div class="container-fluid p-0">
     <div class="row no-gutters min-vh-100">
         <!-- Sidebar Column -->
-        <aside class="col-md-3 col-lg-2 text-white p-3 menusidebar">
             <?php include "inc/sidebar.php"; ?>
-        </aside>
         
         <!-- Main Content Column -->
         <main class="col-md-9 col-lg-10 p-4">

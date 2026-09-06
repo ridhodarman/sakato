@@ -409,11 +409,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <textarea name="catatan" id="edit_catatan" class="form-control" rows="4"></textarea>
                     </div>
 
-                    <div class="form-group">
-                        <label>Tujuan Eskalasi</label>
-                        <input type="text" name="tujuan_eskalasi" id="edit_tujuan_eskalasi" class="form-control" maxlength="250">
-                        <inpu
-                    </div>
 
                     <div class="form-group">
                         <label>Tanggal Selesai</label>
@@ -678,6 +673,21 @@ $('#formTambah').submit(function(e) {
 // BUKA MODAL UPDATE
 // =====================================================
 $(document).on('click', '.btnUpdate', function() {
+
+    // Cek hak akses update berkas
+    let bolehUpdate = <?= (int)($_SESSION['update_berkas'] ?? 0) ?>;
+
+    if (bolehUpdate !== 1) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Akses Ditolak',
+            text: 'Anda tidak memiliki akses untuk update berkas.',
+            confirmButtonText: 'OK'
+        });
+
+        return;
+    }
+
     let id = $(this).data('id');
 
     $.ajax({
@@ -685,7 +695,9 @@ $(document).on('click', '.btnUpdate', function() {
         type: 'POST',
         data: { id: id },
         dataType: 'json',
+
         success: function(response) {
+
             if (!response.status) {
                 Swal.fire({
                     icon: 'error',
@@ -706,11 +718,11 @@ $(document).on('click', '.btnUpdate', function() {
             $('#edit_tanggal_mulai').val(data.tanggal_mulai);
             $('#edit_status').val(data.status);
             $('#edit_catatan').val(data.catatan);
-            $('#edit_tujuan_eskalasi').val(data.tujuan_eskalasi);
             $('#edit_tanggal_selesai').val(data.tanggal_selesai);
 
             $('#modalUpdate').modal('show');
         },
+
         error: function() {
             Swal.fire({
                 icon: 'error',

@@ -2,85 +2,6 @@
 require_once 'auth.php';
 
 // =====================================================
-// CEK HAK AKSES WARNING
-// =====================================================
-
-$idUser = (int)($_SESSION['id_user'] ?? 0);
-
-$stmtUser = $koneksi->prepare("
-    SELECT
-        id,
-        username,
-        nama,
-        pic_id,
-        lihat_semua_warning
-    FROM akun_sakato
-    WHERE id = ?
-    LIMIT 1
-");
-
-$stmtUser->bind_param("i", $idUser);
-$stmtUser->execute();
-
-$resultUser = $stmtUser->get_result();
-$akunUser = $resultUser->fetch_assoc();
-
-$stmtUser->close();
-
-
-// Jika akun tidak ditemukan
-if (!$akunUser) {
-    die("Data akun tidak ditemukan.");
-}
-
-
-// =====================================================
-// DATA HAK AKSES
-// =====================================================
-
-$userPicId = !empty($akunUser['pic_id'])
-    ? (int)$akunUser['pic_id']
-    : null;
-
-$lihatSemuaWarning = (int)($akunUser['lihat_semua_warning'] ?? 0);
-
-
-// =====================================================
-// TENTUKAN MODE TAMPILAN
-// =====================================================
-//
-// ?semua=1 hanya boleh digunakan jika
-// lihat_semua_warning = 1
-//
-
-$tampilkanSemua = false;
-
-if ($lihatSemuaWarning === 1 && isset($_GET['semua']) && $_GET['semua'] == '1') {
-    $tampilkanSemua = true;
-}
-
-
-// =====================================================
-// VALIDASI AKSES
-// =====================================================
-//
-// Kondisi:
-// 1. Punya PIC       -> boleh melihat data PIC tersebut
-// 2. Tidak punya PIC + boleh lihat semua -> boleh melihat semua
-// 3. Tidak punya PIC + tidak boleh lihat semua -> tidak boleh
-//
-
-$aksesWarning = true;
-$pesanAkses = '';
-
-if ($userPicId === null && $lihatSemuaWarning !== 1) {
-
-    $aksesWarning = false;
-
-    $pesanAkses = 'Anda tidak memiliki akses ke data ini, hubungi admin.';
-}
-
-// =====================================================
 // TANGGAL HARI INI
 // =====================================================
 $hariIni = new DateTime();
@@ -281,51 +202,16 @@ $sql = "
         (b.status <> 'selesai' OR b.status IS NULL)
         AND b.tanggal_mulai IS NOT NULL
         AND b.tanggal_mulai <> '0000-00-00'
+
+    ORDER BY
+        b.tanggal_mulai ASC
 ";
 
 
-// =====================================================
-// FILTER BERDASARKAN PIC
-// =====================================================
-//
-// Jika:
-// - user punya pic_id
-// - dan belum memilih "semua"
-//
-// maka hanya tampilkan layanan milik PIC tersebut.
-//
+$result = $koneksi->query($sql);
 
-if ($userPicId !== null && !$tampilkanSemua) {
-
-    $sql .= "
-        AND l.pic_id = " . $userPicId . "
-    ";
-}
-
-
-// =====================================================
-// JIKA USER TIDAK PUNYA PIC
-// DAN TIDAK PUNYA HAK LIHAT SEMUA
-//
-// Query tidak perlu dijalankan karena akses ditolak.
-//
-
-if (!$aksesWarning) {
-
-    $result = false;
-
-} else {
-
-    $sql .= "
-        ORDER BY
-            b.tanggal_mulai ASC
-    ";
-
-    $result = $koneksi->query($sql);
-
-    if (!$result) {
-        die("Query gagal: " . $koneksi->error);
-    }
+if (!$result) {
+    die("Query gagal: " . $koneksi->error);
 }
 
 
@@ -632,141 +518,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div class="mb-4 d-flex justify-content-between align-items-center">
                     <div>
                         <h3 class="mb-1">Monitoring Berkas Rutin</h3>
-
                         <div class="text-muted">
                             Pemantauan berkas berdasarkan batas waktu layanan
                         </div>
                     </div>
-
-                    <div class="d-flex align-items-center">
-
-                        <?php if ($aksesWarning && $lihatSemuaWarning === 1): ?>
-
-                            <?php if ($tampilkanSemua): ?>
-
-                                <a href="warning.php"
-                                class="btn btn-primary font-weight-bold shadow-sm mr-2">
-                                    <i class="fas fa-user mr-1"></i>
-                                    Tampilkan Data PIC Saya
-                                </a>
-
-                            <?php else: ?>
-
-                                <a href="warning.php?semua=1"
-                                class="btn btn-dark font-weight-bold shadow-sm mr-2">
-                                    <i class="fas fa-users mr-1"></i>
-                                    Tampilkan Semua Data Early Warning System
-                                </a>
-
-                            <?php endif; ?>
-
-                        <?php endif; ?>
-
-
-                        <?php if ($aksesWarning): ?>
-
-                            <a href="act/warning_export_excel.php<?= $tampilkanSemua ? '?semua=1' : '' ?>"
-                            target="_blank"
-                            class="btn btn-success font-weight-bold shadow-sm">
-                                <i class="fas fa-file-excel mr-1"></i>
-                                Export ke Excel
-                            </a>
-
-                        <?php endif; ?>
-
+                    <div>
+                        <a href="act/warning_export_excel.php" target="_blank" class="btn btn-success font-weight-bold shadow-sm">
+                            <i class="fas fa-file-excel mr-1"></i> Export ke Excel
+                        </a>
                     </div>
                 </div>
-
-                <?php if (!$aksesWarning): ?>
-
-                <!-- TIDAK MEMILIKI AKSES -->
-                <div class="alert alert-danger shadow-sm mb-4" role="alert">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-lock fa-2x mr-3"></i>
-
-                        <div>
-                            <h5 class="alert-heading mb-1">
-                                Akses Data Ditolak
-                            </h5>
-
-                            <div>
-                                Anda tidak memiliki akses ke data ini,
-                                hubungi admin.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-            <?php elseif ($lihatSemuaWarning === 1 && $userPicId === null): ?>
-
-                <!-- BUKAN PIC, TAPI BOLEH LIHAT SEMUA -->
-                <div class="alert alert-info shadow-sm mb-4" role="alert">
-                    <div class="d-flex align-items-center">
-
-                        <i class="fas fa-info-circle fa-2x mr-3"></i>
-
-                        <div>
-                            <h5 class="alert-heading mb-1">
-                                Akun Ini Bukan Akun PIC
-                            </h5>
-
-                            <div>
-                                Akun Anda tidak terhubung dengan PIC tertentu.
-                                Saat ini ditampilkan seluruh data
-                                Early Warning System.
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-            <?php elseif ($userPicId !== null && $lihatSemuaWarning === 1 && !$tampilkanSemua): ?>
-
-                <!-- PIC + BOLEH LIHAT SEMUA -->
-                <div class="alert alert-info shadow-sm mb-4" role="alert">
-                    <div class="d-flex align-items-center">
-
-                        <i class="fas fa-info-circle fa-2x mr-3"></i>
-
-                        <div>
-                            <h5 class="alert-heading mb-1">
-                                Data Early Warning System
-                            </h5>
-
-                            <div>
-                                Saat ini menampilkan data sesuai PIC Anda.
-                                Gunakan tombol
-                                <strong>"Tampilkan Semua Data Early Warning System"</strong>
-                                untuk melihat seluruh data.
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-            <?php elseif ($userPicId !== null && $lihatSemuaWarning === 1 && $tampilkanSemua): ?>
-
-                <!-- SEDANG MELIHAT SEMUA -->
-                <div class="alert alert-warning shadow-sm mb-4" role="alert">
-                    <div class="d-flex align-items-center">
-
-                        <i class="fas fa-users fa-2x mr-3"></i>
-
-                        <div>
-                            <h5 class="alert-heading mb-1">
-                                Menampilkan Semua Data
-                            </h5>
-
-                            <div>
-                                Saat ini Anda sedang melihat seluruh data
-                                Early Warning System.
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-            <?php endif; ?>
 
                 <!-- STATISTIK -->
                 <div class="row">

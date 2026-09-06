@@ -37,7 +37,6 @@ $sql = "
         posisi_id,
         status,
         catatan,
-        tujuan_eskalasi,
         tanggal_selesai
 
     FROM berkas_rutin

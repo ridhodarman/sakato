@@ -144,7 +144,6 @@ $sql = "
         p.nama_posisi,
         b.status,
         b.catatan,
-        b.tujuan_eskalasi,
         b.tanggal_selesai,
         b.on_update
     FROM berkas_rutin b
@@ -297,7 +296,6 @@ while ($row = $result->fetch_assoc()) {
         'nama_layanan' => htmlspecialchars($row['nama_layanan'] ?? '-'),
         'nama_posisi' => htmlspecialchars($namaPosisi),
         'keterangan' => $keterangan,
-        'tujuan_eskalasi' => htmlspecialchars($row['tujuan_eskalasi']),
         'aksi' => $aksi
     ];
 

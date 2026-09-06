@@ -54,5 +54,98 @@
         overflow-y: visible;
     }
 }
-</style>
 
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.menusidebar {
+    background: #14385f;
+    min-height: 100vh;
+    width: 250px;
+    padding: 1rem;
+    flex: 0 0 250px;
+}
+
+/* Tombol hamburger */
+.sidebar-toggle {
+    display: none;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1050;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+}
+
+/* Overlay HP */
+.sidebar-overlay {
+    display: none;
+}
+
+/* =========================================================
+   RESPONSIVE MOBILE
+   ========================================================= */
+
+@media (max-width: 767.98px) {
+
+    .menusidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+
+        width: 270px;
+        max-width: 85vw;
+
+        min-height: 100vh;
+
+        z-index: 1040;
+
+        overflow-y: auto;
+
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+
+        box-shadow: 5px 0 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .menusidebar.sidebar-open {
+        transform: translateX(0);
+    }
+
+    .sidebar-toggle {
+        display: block;
+    }
+
+    .sidebar-overlay {
+        position: fixed;
+        inset: 0;
+
+        background: rgba(0, 0, 0, 0.45);
+
+        z-index: 1030;
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+    }
+
+    /* Supaya isi halaman tidak tertutup tombol hamburger */
+    .main-content {
+        padding-top: 65px;
+    }
+
+    /* Menu lebih nyaman disentuh di HP */
+    .menusidebar .nav-link {
+        min-height: 44px;
+        padding: 10px 12px;
+    }
+
+    /* Judul SAKATO sedikit lebih ringkas */
+    .menusidebar .h4 {
+        font-size: 1.15rem;
+    }
+}
+</style>

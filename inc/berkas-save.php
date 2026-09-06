@@ -39,8 +39,6 @@ $status = $_POST['status'] ?? 'proses';
 
 $catatan = trim($_POST['catatan'] ?? '');
 
-$tujuan_eskalasi = trim($_POST['tujuan_eskalasi'] ?? '');
-
 $tanggal_selesai = $_POST['tanggal_selesai'] ?? '';
 
 
@@ -158,7 +156,6 @@ $sql = "
         posisi_id = ?,
         status = ?,
         catatan = ?,
-        tujuan_eskalasi = ?,
         tanggal_selesai = ?
     WHERE id = ?
 ";
@@ -167,7 +164,7 @@ $stmt = $koneksi->prepare($sql);
 
 // Tipe parameter: i (int), i (int), s (string), s (string), i (int), i (int), s (string), s (string), s (string), i (int)
 $stmt->bind_param(
-    "iissiissssi",
+    "iissiisssi",
     $no_berkas,
     $tahun,
     $nama_pemohon,
@@ -176,7 +173,6 @@ $stmt->bind_param(
     $posisi_id,
     $status,
     $catatan,
-    $tujuan_eskalasi,
     $tanggal_selesai,
     $id
 );

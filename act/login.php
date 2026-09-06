@@ -22,7 +22,7 @@ if ($username === '' || $password === '') {
 
 // Cari akun berdasarkan username saja
 $stmt = $koneksi->prepare("
-    SELECT id, username, nama, password
+    SELECT id, username, nama, password, update_berkas
     FROM akun_sakato
     WHERE username = ?
     LIMIT 1
@@ -48,6 +48,7 @@ if ($result->num_rows === 1) {
         $_SESSION['id_user']      = $user['id'];
         $_SESSION['username']     = $user['username'];
         $_SESSION['nama']         = $user['nama'];
+        $_SESSION['update_berkas']= (int)$user['update_berkas'];
 
         $stmt->close();
 

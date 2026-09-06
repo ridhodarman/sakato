@@ -657,11 +657,14 @@ $sql = "
         b.on_update,
 
         l.nama_layanan,
+        l.jatuh_tempo,
+        l.waspada,
+        l.kritis,
 
         p.nama AS nama_pic,
 
         (
-        SELECT COUNT(*)
+            SELECT COUNT(*)
             FROM eskalasi e2
             WHERE e2.berkas_rutin_id = b.id
         ) AS jumlah_tujuan_eskalasi,
@@ -684,13 +687,12 @@ $sql = "
         ON l.id = b.layanan_id
 
     LEFT JOIN pic p
-        ON p.id = b.posisi_id
+        ON p.id = l.pic_id
 
     WHERE b.status = 'eskalasi'
 
     ORDER BY b.tanggal_mulai ASC
 ";
-
 
 $result = $koneksi->query($sql);
 
@@ -710,13 +712,6 @@ if (!$result) {
 $dataEskalasi = [];
 
 
-/*
-|--------------------------------------------------------------------------
-| STATISTIK SEKSI
-|--------------------------------------------------------------------------
-*/
-
-$statistikSeksi = [];
 
 
 /*
@@ -789,13 +784,13 @@ while ($row = $result->fetch_assoc()) {
 
         }
 
-        elseif ($umurHari >= $row['kritis']) {
+        elseif ($umurHari >= (int)($row['kritis'] ?? 0)) {
 
             $row['kategori_waktu'] = 'Kritis';
 
         }
 
-        elseif ($umurHari >= $row['waspada']) {
+        elseif ($umurHari >= (int)($row['waspada'] ?? 0)) {
 
             $row['kategori_waktu'] = 'Waspada';
 
@@ -813,31 +808,6 @@ while ($row = $result->fetch_assoc()) {
 
     }
 
-
-    /*
-    |--------------------------------------------------------------
-    | STATISTIK SEKSI
-    |--------------------------------------------------------------
-    */
-
-    $seksi = trim($row['seksi'] ?? '');
-
-
-    if ($seksi == '') {
-
-        $seksi = 'Belum ditentukan';
-
-    }
-
-
-    if (!isset($statistikSeksi[$seksi])) {
-
-        $statistikSeksi[$seksi] = 0;
-
-    }
-
-
-    $statistikSeksi[$seksi]++;
 
 
     /*
@@ -860,13 +830,6 @@ while ($row = $result->fetch_assoc()) {
 $totalEskalasi = count($dataEskalasi);
 
 
-/*
-|--------------------------------------------------------------------------
-| URUTKAN SEKSI
-|--------------------------------------------------------------------------
-*/
-
-arsort($statistikSeksi);
 
 
 /*
@@ -938,7 +901,6 @@ $dataEskalasiSaya = [];
 
 $stmtSayaList = $koneksi->prepare("
     SELECT
-
         b.id,
         b.no_berkas,
         b.tahun,
@@ -946,8 +908,7 @@ $stmtSayaList = $koneksi->prepare("
         b.tanggal_mulai,
         b.catatan,
 
-        l.nama_layanan,
-        l.seksi
+        l.nama_layanan
 
     FROM eskalasi e
 
@@ -1269,105 +1230,6 @@ $stmtSayaList->close();
 
     }
 
-
-    /* =================================================
-       SEKSI
-       ================================================= */
-
-    .section-card {
-
-        background:
-            white;
-
-        border-radius:
-            16px;
-
-        padding:
-            22px;
-
-        box-shadow:
-            0 8px 25px rgba(15,23,42,.07);
-
-        height:
-            100%;
-
-    }
-
-
-    .section-title {
-
-        font-size:
-            15px;
-
-        font-weight:
-            700;
-
-        margin-bottom:
-            18px;
-
-    }
-
-
-    .seksi-item {
-
-        display:
-            flex;
-
-        justify-content:
-            space-between;
-
-        align-items:
-            center;
-
-        padding:
-            10px 0;
-
-        border-bottom:
-            1px solid #f1f5f9;
-
-    }
-
-
-    .seksi-item:last-child {
-
-        border-bottom:
-            none;
-
-    }
-
-
-    .seksi-name {
-
-        font-size:
-            13px;
-
-        color:
-            #475569;
-
-    }
-
-
-    .seksi-count {
-
-        background:
-            #fff7ed;
-
-        color:
-            #ea580c;
-
-        border-radius:
-            20px;
-
-        padding:
-            4px 10px;
-
-        font-size:
-            12px;
-
-        font-weight:
-            700;
-
-    }
 
 
     /* =================================================
@@ -2026,65 +1888,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
 
 
-                <!-- =================================================
-                     DISTRIBUSI SEKSI
-                     ================================================= -->
-
-                <div class="col-lg-4 col-md-12 mb-3">
-
-                    <div class="section-card">
-
-                        <div class="section-title">
-
-                            Distribusi Berdasarkan Seksi
-
-                        </div>
-
-
-                        <?php if (count($statistikSeksi) > 0): ?>
-
-                            <?php foreach (
-                                array_slice(
-                                    $statistikSeksi,
-                                    0,
-                                    4,
-                                    true
-                                )
-                                as $seksi => $jumlah
-                            ): ?>
-
-                                <div class="seksi-item">
-
-                                    <span class="seksi-name">
-
-                                        <?= htmlspecialchars($seksi) ?>
-
-                                    </span>
-
-
-                                    <span class="seksi-count">
-
-                                        <?= $jumlah ?>
-
-                                    </span>
-
-                                </div>
-
-                            <?php endforeach; ?>
-
-                        <?php else: ?>
-
-                            <div class="text-muted">
-
-                                Belum ada data eskalasi.
-
-                            </div>
-
-                        <?php endif; ?>
-
-                    </div>
-
-                </div>
 
             </div>
 
@@ -2218,10 +2021,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                                 <th>
                                     Layanan
-                                </th>
-
-                                <th>
-                                    Seksi
                                 </th>
 
                                 <th>
@@ -2422,17 +2221,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                             ) ?>
 
                                         </div>
-
-                                    </td>
-
-
-                                    <!-- SEKSI -->
-
-                                    <td>
-
-                                        <?= htmlspecialchars(
-                                            $row['seksi'] ?? '-'
-                                        ) ?>
 
                                     </td>
 
@@ -2807,10 +2595,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             </th>
 
                             <th>
-                                Seksi
-                            </th>
-
-                            <th>
                                 Tanggal Mulai
                             </th>
 
@@ -2869,15 +2653,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                                     <?= htmlspecialchars(
                                         $item['nama_layanan'] ?? '-'
-                                    ) ?>
-
-                                </td>
-
-
-                                <td>
-
-                                    <?= htmlspecialchars(
-                                        $item['seksi'] ?? '-'
                                     ) ?>
 
                                 </td>
